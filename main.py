@@ -1,5 +1,7 @@
 import socket
-from typing import Union, Tuple, Final, Dict, List, Optional, Any
+from typing import Union, Tuple, Final, Dict, List, Optional
+
+import numpy as np
 
 
 class ChannelSettings:
@@ -298,26 +300,18 @@ class E502:
         self.write_register(0x306, new_value - 1)
 
     def get_data(self, size: int):
-        try:
-            import numpy as np
-            struct = None
-        except ImportError:
-            import struct
-            np = None
         if size < 0:
             raise ValueError('Invalid data size', size)
-        data = device._data_socket.recv(size * 4 * len(self._settings))
-        if struct is not None:
-            def reshape(ravelled_tuple: Union[List[Any], Tuple[Any]], new_columns_number: int) \
-                    -> Union[List[List[Any]], Tuple[Tuple[Any]]]:
-                if len(ravelled_tuple) % new_columns_number:
-                    raise ValueError('Impossible to reshape')
-                return type(ravelled_tuple)(ravelled_tuple[_c::new_columns_number]
-                                            for _c in range(new_columns_number))
 
-            return reshape(struct.unpack(f'<{len(data) // 4}f', data), 2)
-        if np is not None:
-            return np.frombuffer(data, np.float32).reshape((2, -1), ).T
+        data: bytes = b''
+        remaining_count: int = size * np.dtype(np.float32).itemsize * len(self._settings)
+        while remaining_count > 0:
+            data_piece: bytes = device._data_socket.recv(remaining_count)
+            remaining_count -= len(data_piece)
+            data += data_piece
+        if remaining_count < 0:
+            data = data[:remaining_count]
+        return np.frombuffer(data, np.float32).reshape((len(self._settings), -1), ).T
 
 
 if __name__ == '__main__':
@@ -329,14 +323,19 @@ if __name__ == '__main__':
     settings.physical_channel = 0
     settings.mode = 0
     settings.averaging = 1
-    device.write_channels_settings_table([settings for _ in range(2)])
-    device.set_adc_frequency_divider(2)
+    device.write_channels_settings_table([settings for _ in range(8)])
+    device.set_adc_frequency_divider(1)
     device.enable_in_stream(from_adc=True)
     device.start_data_stream()
     device.preload_adc()
     device.set_sync_io(True)
     try:
-        print(device.get_data(2))
+        import time
+
+        t0 = time.time()
+        for i in range(16):
+            device.get_data(1 << 16)
+            print(i, (time.time() - t0) / (i + 1) / (1 << 16) / 8)
     except KeyboardInterrupt:
         pass
     device.set_sync_io(False)
