@@ -1,3 +1,4 @@
+# coding: utf-8
 from channel_settings import ChannelSettings
 from e502 import E502
 

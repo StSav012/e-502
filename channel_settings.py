@@ -1,4 +1,14 @@
-from typing import Union, Final, Dict, Optional
+# coding: utf-8
+from typing import Union, Dict, Optional
+
+try:
+    from typing import Final
+except ImportError:
+    # stub
+    class Final:
+        @staticmethod
+        def __getitem__(item):
+            return item
 
 
 class ChannelSettings:
