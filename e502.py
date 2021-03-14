@@ -182,7 +182,7 @@ class E502:
         self._data_socket.connect((self._ip, 11115))
         return response
 
-    def read_channels_settings_table(self):
+    def read_channels_settings_table(self) -> Tuple[List[ChannelSettings], int]:
         channels_count, error = self.read_int(0x300)
         channels_settings: List[ChannelSettings] = []
         if error:
@@ -220,7 +220,7 @@ class E502:
             raise ValueError('Invalid digital lines frequency divider')
         self.write_register(0x306, new_value - 1)
 
-    def get_data(self, size: int):
+    def get_data(self, size: int) -> np.ndarray:
         if size < 0:
             raise ValueError('Invalid data size', size)
 
