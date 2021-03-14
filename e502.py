@@ -1,15 +1,17 @@
 # coding: utf-8
 import socket
-from typing import Union, Tuple, List
+from typing import Union, Tuple, List, Type
 
 try:
-    from typing import Final
+    from typing import Final as Final
 except ImportError:
     # stub
-    class Final:
+    class _Final:
         @staticmethod
-        def __getitem__(item):
+        def __getitem__(item: Type) -> Type:
             return item
+
+    Final = _Final()
 
 import numpy as np
 
