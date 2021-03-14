@@ -1,6 +1,6 @@
 # coding: utf-8
 from configparser import ConfigParser
-from threading import Thread
+from threading import Thread, Lock
 from typing import List, Type, NamedTuple
 
 import numpy as np
@@ -30,6 +30,7 @@ class FileWriter(Thread):
         self.daemon = True
 
         self.queue: List[QueueRecord] = []
+        self.lock: Lock = Lock()
         self.done: bool = False
 
     def __del__(self):
@@ -37,11 +38,13 @@ class FileWriter(Thread):
         self.done = True
 
     def write_data(self, file_name: str, file_mode: str, x: np.ndarray, y: np.ndarray) -> None:
-        self.queue.append(QueueRecord(file_name, file_mode, x, y))
+        with self.lock:
+            self.queue.append(QueueRecord(file_name, file_mode, x, y))
 
     def _write_queue(self):
         while self.queue:
-            qr: QueueRecord = self.queue.pop(0)
+            with self.lock:
+                qr: QueueRecord = self.queue.pop(0)
             with open(qr.file_name, qr.file_mode) as f_out:
                 f_out.writelines(f'{x}\t{y}\n' for x, y in zip(qr.x, qr.y))
 
