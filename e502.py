@@ -1,6 +1,8 @@
 # coding: utf-8
 import socket
-from typing import Union, Tuple, List, Type
+import struct
+from datetime import datetime
+from typing import Union, Tuple, List, Type, Optional
 
 try:
     from typing import Final as Final
@@ -18,6 +20,75 @@ import numpy as np
 from channel_settings import ChannelSettings
 
 
+class HardwareInfo:
+    def __init__(self, data: bytes = bytes()):
+        self._has_dac: Optional[bool] = None
+        self._has_galvanic_decoupling: Optional[bool] = None
+        self._has_black_fin: Optional[bool] = None
+        self._plda_version: Optional[int] = None
+        self._board_revision: Optional[int] = None
+        self._fpga_version: Optional[Tuple[int, int]] = None
+        self.fill_from_bytes(data)
+
+    def fill_from_bytes(self, data: bytes):
+        if isinstance(data, bytes) and len(data) == 4:
+            self._has_dac = bool(data[0] & 1)
+            self._has_galvanic_decoupling = bool(data[0] & 2)
+            self._has_black_fin = bool(data[0] & 4)
+            self._plda_version = data[0] >> 4
+            self._board_revision = data[1] & 0x0f
+            self._fpga_version = data[3], data[2]
+        elif data:
+            self._has_dac = None
+            self._has_galvanic_decoupling = None
+            self._has_black_fin = None
+            self._plda_version = None
+            self._board_revision = None
+            self._fpga_version = None
+            raise ValueError('Incorrect hardware data')
+
+    def __repr__(self) -> str:
+        return '\n'.join((
+            'DAC is' + '' if self._has_dac else ' not' + ' present',
+            'Galvanic decoupling is' + '' if self._has_galvanic_decoupling else ' not' + ' present',
+            'BlackFin is' + '' if self._has_black_fin else ' not' + ' present',
+            'PLDA version:', self._plda_version,
+            'Board revision:', self._board_revision,
+            f'FPGA version: {self._fpga_version[0]}.{self._fpga_version[1]}',
+        ))
+
+    def __str__(self) -> str:
+        return '-'.join((
+            'XP'[self._has_black_fin],
+            'EU',
+            'XD'[self._has_dac]
+        ))
+
+    @property
+    def has_dac(self) -> Optional[bool]:
+        return self._has_dac
+
+    @property
+    def has_galvanic_decoupling(self) -> Optional[bool]:
+        return self._has_galvanic_decoupling
+
+    @property
+    def has_black_fin(self) -> Optional[bool]:
+        return self._has_black_fin
+
+    @property
+    def plda_version(self) -> Optional[int]:
+        return self._plda_version
+
+    @property
+    def board_revision(self) -> Optional[int]:
+        return self._board_revision
+
+    @property
+    def fpga_version(self) -> Optional[Tuple[int, int]]:
+        return self._fpga_version
+
+
 class E502:
     def __init__(self, ip: str, verbose: bool = False):
         self._ip: Final[str] = ip[:]
@@ -28,11 +99,21 @@ class E502:
         self._settings: List[ChannelSettings] = []
         self._verbose: Final[bool] = verbose
 
+        self._digital_out: List[bool] = [False] * 16
+        self._adc_scales: List[float] = []
+        self._adc_offsets: List[float] = []
+        self._dac_scales: List[float] = []
+        self._dac_offsets: List[float] = []
+
     def __del__(self):
         self._control_socket.close()
         self._data_socket.close()
 
-    def send_request(self, command: int, parameter: int, payload: bytes, response_size: int):
+    def send_request(self, command: int, parameter: int, payload: Union[bytes, int, bool], response_size: int):
+        if isinstance(payload, bool):
+            payload = int(payload)
+        if isinstance(payload, int):
+            payload = payload.to_bytes(4, 'little')
         if len(payload) > 512:
             raise ValueError('Too large payload')
         if response_size > 512:
@@ -50,7 +131,7 @@ class E502:
         ctl1: bytes = self._control_socket.recv(4)
         if self._verbose:
             print(f"CTL1          = {ctl1}")
-        error: int = int.from_bytes(self._control_socket.recv(4), 'little')
+        error: int = int.from_bytes(self._control_socket.recv(4), 'little', signed=True)
         if self._verbose:
             print(f"error         = {error:x}")
         response_size: int = int.from_bytes(self._control_socket.recv(4), 'little')
@@ -154,9 +235,20 @@ class E502:
         return self.get_response()[1]
 
     def read_int(self, number: int) -> Tuple[int, int]:
-        self.send_request(0x10, number, bytes(), 4)
-        response: Final[Tuple[bytes, int]] = self.get_response()
+        response: Final[Tuple[bytes, int]] = self.read_register(number)
         return int.from_bytes(response[0], 'little'), response[1]
+
+    def read_flash_memory(self, address: int, length: int) -> Tuple[bytes, int]:
+        if not (0 < length < 512):
+            raise ValueError('Invalid data length to read')
+        self.send_request(0x17, address, bytes(), length)
+        return self.get_response()
+
+    def write_flash_memory(self, address: int, data: bytes) -> Tuple[bytes, int]:
+        if not (0 < len(data) < 512):
+            raise ValueError('Invalid data length to write')
+        self.send_request(0x18, address, data, 0)
+        return self.get_response()
 
     def start_data_stream(self, as_dac: bool = False) -> int:
         self.send_request(0x12, (1 << 16) if as_dac else 0, bytes(), 0)
@@ -174,6 +266,53 @@ class E502:
     def read_module_data(self) -> Tuple[bytes, int]:
         self.send_request(0x80, 0, bytes(), 192)
         return self.get_response()
+
+    def hardware(self) -> Optional[HardwareInfo]:
+        data: bytes
+        error: int
+        data, error = self.read_register(0x010a)
+        if error:
+            if self._verbose:
+                print('error:', error)
+            return None
+        else:
+            if self._verbose:
+                print(HardwareInfo(data))
+            return HardwareInfo(data)
+
+    def calibration_data(self):
+        data: bytes
+        error: int
+        data, error = self.read_flash_memory(0x1F0080, 0xe0)
+        if self._verbose and error:
+            print('error:', error)
+        else:
+            while data:
+                target: int = int.from_bytes(data[12:16], 'little')
+                if self._verbose:
+                    print('for', ['', 'ADC', 'DAC'][target] + ':')
+                    print('calibration time:', datetime.fromtimestamp(int.from_bytes(data[32:40], 'little')))
+                channels_count: int = int.from_bytes(data[40:44], 'little')
+                ranges_count: int = int.from_bytes(data[44:48], 'little')
+                offset: int = 48
+                for r in range(ranges_count):
+                    for c in range(channels_count):
+                        if self._verbose:
+                            print(f'for range {r} of channel {c}: ', end='')
+                            print(f'offset is', *struct.unpack_from('<d', data, offset), end=', ')
+                        if target == 1:
+                            self._adc_offsets.extend(struct.unpack_from('<d', data, offset))
+                        elif target == 2:
+                            self._dac_offsets.extend(struct.unpack_from('<d', data, offset))
+                        offset += 8
+                        if self._verbose:
+                            print(f'scale is', *struct.unpack_from('<d', data, offset))
+                        if target == 1:
+                            self._adc_scales.extend(struct.unpack_from('<d', data, offset))
+                        elif target == 2:
+                            self._dac_scales.extend(struct.unpack_from('<d', data, offset))
+                        offset += 8
+                data = data[offset:]
 
     def reset_data_socket(self) -> int:
         self.send_request(0x23, 0, bytes(), 0)
@@ -198,6 +337,27 @@ class E502:
         self.write_register(0x300, len(channels_settings) - 1)
         for channel, channel_settings in enumerate(channels_settings):
             self.write_register(0x200 + 4 * (len(channels_settings) - channel - 1), int(channel_settings))
+
+    def write_analog(self, index: int, value: float):
+        if not self._dac_scales:
+            self.calibration_data()
+        if not (0 <= index < len(self._dac_scales)):
+            raise ValueError('Invalid analog output')
+        payload: bytes = round(value * self._dac_scales[index] * 6000 + self._dac_offsets[index])\
+            .to_bytes(2, 'little', signed=True) + b'\0' + [b'\x40', b'\x80'][index]
+        self.send_request(
+            0x11, 0x312,
+            payload,
+            0)
+
+    def write_digital(self, index: int, on: bool):
+        if not (0 <= index < len(self._digital_out)):
+            raise ValueError('Invalid digital output')
+        self._digital_out[index] = on
+        self.send_request(
+            0x11, 0x312,
+            sum((1 << i) for i, v in enumerate(self._digital_out) if v),
+            0)
 
     def preload_adc(self):
         self.write_register(0x30C, 1)
