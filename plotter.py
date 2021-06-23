@@ -6,7 +6,7 @@ from typing import Dict, List, Union
 
 import numpy as np
 import pyqtgraph as pg
-from PySide6.QtCore import QSettings, QTimer, Qt
+from PySide6.QtCore import QSettings, QTimer, Qt, Signal
 from PySide6.QtGui import QCloseEvent, QValidator
 from PySide6.QtWidgets import QApplication, QFormLayout, QGroupBox, QHBoxLayout, QLineEdit, \
     QMainWindow, \
@@ -46,10 +46,13 @@ class IPAddressValidator(QValidator):
 
 
 class ChannelSettingsGUI(QGroupBox, ChannelSettings):
+    channelChanged: Signal = Signal(int, name='channelChanged')
+
     def __init__(self):
         super().__init__()
 
         self.setCheckable(True)
+        self.setChecked(False)
 
         self.combo_range: pg.ComboBox = pg.ComboBox(self, items={'±10 V': 0,
                                                                  '±5 V': 1, '±2 V': 2, '±1 V': 3,
@@ -79,6 +82,7 @@ class ChannelSettingsGUI(QGroupBox, ChannelSettings):
 
     def on_spin_channel_changed(self, new_value: int) -> None:
         self.physical_channel = new_value - 1
+        self.channelChanged.emit(self.physical_channel)
 
     def on_combo_mode_changed(self, _index: int) -> None:
         self.mode = self.combo_mode.value()
@@ -196,6 +200,10 @@ class GUI(QMainWindow):
         self.button_start.clicked.connect(self.on_button_start_clicked)
         self.button_stop.clicked.connect(self.on_button_stop_clicked)
 
+        index: int
+        for index in range(8):
+            self.tab[index].channelChanged.connect(lambda channel: self.on_tab_channel_changed(index, channel))
+
     def load_settings(self) -> None:
         self.restoreGeometry(self.settings.value('windowGeometry', b''))
         self.restoreState(self.settings.value('windowState', b''))
@@ -229,12 +237,23 @@ class GUI(QMainWindow):
     def on_button_start_clicked(self) -> None:
         self.button_start.setDisabled(True)
         self.parameters_box.setDisabled(True)
+        self.tabs.setDisabled(True)
         self.button_stop.setEnabled(True)
 
     def on_button_stop_clicked(self) -> None:
         self.button_stop.setDisabled(True)
         self.parameters_box.setEnabled(True)
+        self.tabs.setEnabled(True)
         self.button_start.setEnabled(True)
+
+    def on_tab_channel_changed(self, tab_index: int, channel: int) -> None:
+        index: int
+        tab: ChannelSettingsGUI
+        for index, tab in enumerate(self.tab):
+            if index == tab_index:
+                continue
+            if channel == tab.physical_channel:
+                tab.setChecked(False)
 
 
 class App(GUI):
