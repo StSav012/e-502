@@ -2,7 +2,7 @@
 import sys
 import time
 from multiprocessing import Process, Queue
-from typing import Dict, List, Union
+from typing import Dict, List, Set, Union
 
 import numpy as np
 import pyqtgraph as pg
@@ -49,7 +49,8 @@ class ChannelSettingsGUI(QGroupBox, ChannelSettings):
     channelChanged: Signal = Signal(int, name='channelChanged')
 
     def __init__(self):
-        super().__init__()
+        QGroupBox.__init__(self, 'Enabled')
+        ChannelSettings.__init__(self)
 
         self.setCheckable(True)
         self.setChecked(False)
@@ -58,18 +59,23 @@ class ChannelSettingsGUI(QGroupBox, ChannelSettings):
                                                                  '±5 V': 1, '±2 V': 2, '±1 V': 3,
                                                                  '±0.5 V': 4, '±0.2 V': 5})
         self.combo_range.currentIndexChanged.connect(self.on_combo_range_changed)
+        self.range = self.combo_range.value()
 
         self.spin_channel: QSpinBox = QSpinBox(self)
         self.spin_channel.setRange(1, 16)
         self.spin_channel.valueChanged.connect(self.on_spin_channel_changed)
+        self.physical_channel = self.spin_channel.value() - 1
 
         self.combo_mode: pg.ComboBox = pg.ComboBox(self, items={'Differential': 0,
                                                                 'Channels 1 to 16 with common GND': 1,
                                                                 'Channels 16 to 32 with common GND': 2,
                                                                 'Grounded ADC': 3})
         self.combo_mode.currentIndexChanged.connect(self.on_combo_mode_changed)
+        self.mode = self.combo_mode.value()
 
         self.spin_averaging: QSpinBox = QSpinBox(self)
+        self.spin_averaging.setRange(1, 128)
+        self.averaging = self.spin_averaging.value()
 
         self.setLayout(QFormLayout())
         self.layout().addRow('Range', self.combo_range)
@@ -202,7 +208,8 @@ class GUI(QMainWindow):
 
         index: int
         for index in range(8):
-            self.tab[index].channelChanged.connect(lambda channel: self.on_tab_channel_changed(index, channel))
+            self.tab[index].channelChanged.connect(self.on_tab_channel_changed)
+            self.tab[index].toggled.connect(self.on_tab_toggled)
 
     def load_settings(self) -> None:
         self.restoreGeometry(self.settings.value('windowGeometry', b''))
@@ -246,14 +253,27 @@ class GUI(QMainWindow):
         self.tabs.setEnabled(True)
         self.button_start.setEnabled(True)
 
-    def on_tab_channel_changed(self, tab_index: int, channel: int) -> None:
+    def on_tab_channel_changed(self, channel: int) -> None:
         index: int
         tab: ChannelSettingsGUI
+        tab_index: int = self.tabs.indexOf(self.sender())
         for index, tab in enumerate(self.tab):
             if index == tab_index:
                 continue
             if channel == tab.physical_channel:
                 tab.setChecked(False)
+
+    def on_tab_toggled(self, on: bool) -> None:
+        if not on:
+            return
+        other_channels: Set[int] = set()
+        tab: ChannelSettingsGUI
+        for tab in self.tab:
+            if tab.isChecked() and tab is not self.sender():
+                other_channels.add(tab.physical_channel)
+        self.sender().spin_channel.setValue(min(set(list(range(self.sender().spin_channel.minimum() - 1,
+                                                               self.sender().spin_channel.maximum())))
+                                                .difference(other_channels)) + 1)
 
 
 class App(GUI):
