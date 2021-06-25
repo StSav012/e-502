@@ -1,8 +1,7 @@
 # coding: utf-8
 import sys
-import time
 from multiprocessing import Process, Queue
-from typing import Dict, List, Set, Union
+from typing import Dict, List, Optional, Set, Union
 
 import numpy as np
 import pyqtgraph as pg
@@ -13,21 +12,37 @@ from PySide6.QtWidgets import QApplication, QFormLayout, QGroupBox, QHBoxLayout,
     QPushButton, QSpinBox, QTabWidget, QVBoxLayout, QWidget
 
 from channel_settings import ChannelSettings
+from e502 import E502
 
 
 class Measurement(Process):
-    def __init__(self, requests_queue: Queue, results_queue: Queue) -> None:
+    def __init__(self, requests_queue: Queue, results_queue: Queue,
+                 ip_address: str, settings: List[ChannelSettings], adc_frequency_divider: int,
+                 data_portion_size: int) -> None:
         super(Measurement, self).__init__()
         self.requests_queue: Queue = requests_queue
         self.results_queue: Queue = results_queue
 
-    def terminate(self):
+        self.device: E502 = E502(ip_address)
+        self.device.write_channels_settings_table(settings)
+        self.device.set_adc_frequency_divider(adc_frequency_divider)
+
+        self.data_portion_size: int = data_portion_size
+
+    def terminate(self) -> None:
+        self.device.set_sync_io(False)
+        self.device.stop_data_stream()
+
         super(Measurement, self).terminate()
 
-    def run(self):
+    def run(self) -> None:
+        self.device.enable_in_stream(from_adc=True)
+        self.device.start_data_stream()
+        self.device.preload_adc()
+        self.device.set_sync_io(True)
+
         while True:
-            self.results_queue.put(np.column_stack((np.linspace(0, 0.5, 100), np.random.normal(size=100))))
-            time.sleep(0.5)
+            self.results_queue.put(self.device.get_data(self.data_portion_size))
 
 
 class IPAddressValidator(QValidator):
@@ -48,16 +63,15 @@ class IPAddressValidator(QValidator):
 class ChannelSettingsGUI(QGroupBox, ChannelSettings):
     channelChanged: Signal = Signal(int, name='channelChanged')
 
-    def __init__(self):
+    def __init__(self) -> None:
         QGroupBox.__init__(self, 'Enabled')
         ChannelSettings.__init__(self)
 
         self.setCheckable(True)
         self.setChecked(False)
 
-        self.combo_range: pg.ComboBox = pg.ComboBox(self, items={'±10 V': 0,
-                                                                 '±5 V': 1, '±2 V': 2, '±1 V': 3,
-                                                                 '±0.5 V': 4, '±0.2 V': 5})
+        self.combo_range: pg.ComboBox = pg.ComboBox(self, items={'±10 V': 0, '±5 V': 1, '±2 V': 2,
+                                                                 '±1 V': 3, '±0.5 V': 4, '±0.2 V': 5})
         self.combo_range.currentIndexChanged.connect(self.on_combo_range_changed)
         self.range = self.combo_range.value()
 
@@ -75,6 +89,7 @@ class ChannelSettingsGUI(QGroupBox, ChannelSettings):
 
         self.spin_averaging: QSpinBox = QSpinBox(self)
         self.spin_averaging.setRange(1, 128)
+        self.spin_averaging.valueChanged.connect(self.on_spin_averaging_changed)
         self.averaging = self.spin_averaging.value()
 
         self.setLayout(QFormLayout())
@@ -98,10 +113,8 @@ class ChannelSettingsGUI(QGroupBox, ChannelSettings):
             self.spin_channel.setRange(0, 16)
         self.spin_channel.setDisabled(self.mode == 3)
 
-    # TODO:
-    #  − add sync between the channel properties and the GUI
-    #  − limit the channel and the averaging according to the mode and the sample rate required
-    #  − avoid selecting same physical channel more than once
+    def on_spin_averaging_changed(self, new_value: int) -> None:
+        self.averaging = new_value
 
 
 class GUI(QMainWindow):
@@ -202,7 +215,7 @@ class GUI(QMainWindow):
 
         self.setCentralWidget(self.central_widget)
 
-    def setup_actions(self):
+    def setup_actions(self) -> None:
         self.button_start.clicked.connect(self.on_button_start_clicked)
         self.button_stop.clicked.connect(self.on_button_stop_clicked)
 
@@ -285,22 +298,28 @@ class App(GUI):
 
         self.requests_queue: Queue = Queue()
         self.results_queue: Queue = Queue()
-        self.measurement: Measurement = Measurement(self.requests_queue, self.results_queue)
+        self.measurement: Optional[Measurement] = None
 
     def on_button_start_clicked(self) -> None:
         super(App, self).on_button_start_clicked()
         self.timer.start(10)
-        self.measurement = Measurement(self.requests_queue, self.results_queue)
+        self.measurement = Measurement(self.requests_queue, self.results_queue,
+                                       ip_address=self.text_ip_address.text(),
+                                       settings=self.tab,
+                                       adc_frequency_divider=self.spin_frequency_divider.value(),
+                                       data_portion_size=self.spin_portion_size.value())
         self.measurement.start()
 
     def on_button_stop_clicked(self) -> None:
-        self.measurement.terminate()
-        self.measurement.join()
+        if self.measurement is not None:
+            self.measurement.terminate()
+            self.measurement.join()
         self.timer.stop()
         super(App, self).on_button_stop_clicked()
 
-    def on_timeout(self):
+    def on_timeout(self) -> None:
         if not self.results_queue.empty():
+            # TODO: draw several lines of different colors versa point number
             self.plot_line.setData(self.results_queue.get())
 
 
