@@ -22,11 +22,11 @@ from hardware_info import HardwareInfo
 
 
 class E502:
-    def __init__(self, ip: str, verbose: bool = False):
+    def __init__(self, ip: str, verbose: bool = False) -> None:
         self._ip: Final[str] = ip[:]
-        self._control_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self._control_socket: socket.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self._control_socket.connect((ip, 11114))
-        self._data_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self._data_socket: socket.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self._data_socket.connect((ip, 11115))
         self._settings: List[ChannelSettings] = []
         self._verbose: Final[bool] = verbose
@@ -37,11 +37,11 @@ class E502:
         self._dac_scales: List[float] = []
         self._dac_offsets: List[float] = []
 
-    def __del__(self):
+    def __del__(self) -> None:
         self._control_socket.close()
         self._data_socket.close()
 
-    def send_request(self, command: int, parameter: int, payload: Union[bytes, int, bool], response_size: int):
+    def send_request(self, command: int, parameter: int, payload: Union[bytes, int, bool], response_size: int) -> None:
         if isinstance(payload, bool):
             payload = int(payload)
         if isinstance(payload, int):
@@ -212,39 +212,39 @@ class E502:
                 print(HardwareInfo(data))
             return HardwareInfo(data)
 
-    def calibration_data(self):
+    def calibration_data(self) -> None:
         data: bytes
         error: int
         data, error = self.read_flash_memory(0x1F0080, 0xe0)
         if self._verbose and error:
             print('error:', error)
-        else:
-            while data:
-                target: int = int.from_bytes(data[12:16], 'little')
-                if self._verbose:
-                    print('for', ['', 'ADC', 'DAC'][target] + ':')
-                    print('calibration time:', datetime.fromtimestamp(int.from_bytes(data[32:40], 'little')))
-                channels_count: int = int.from_bytes(data[40:44], 'little')
-                ranges_count: int = int.from_bytes(data[44:48], 'little')
-                offset: int = 48
-                for r in range(ranges_count):
-                    for c in range(channels_count):
-                        if self._verbose:
-                            print(f'for range {r} of channel {c}: ', end='')
-                            print(f'offset is', *struct.unpack_from('<d', data, offset), end=', ')
-                        if target == 1:
-                            self._adc_offsets.extend(struct.unpack_from('<d', data, offset))
-                        elif target == 2:
-                            self._dac_offsets.extend(struct.unpack_from('<d', data, offset))
-                        offset += 8
-                        if self._verbose:
-                            print(f'scale is', *struct.unpack_from('<d', data, offset))
-                        if target == 1:
-                            self._adc_scales.extend(struct.unpack_from('<d', data, offset))
-                        elif target == 2:
-                            self._dac_scales.extend(struct.unpack_from('<d', data, offset))
-                        offset += 8
-                data = data[offset:]
+            return
+        while data:
+            target: int = int.from_bytes(data[12:16], 'little')
+            if self._verbose:
+                print('for', ['', 'ADC', 'DAC'][target] + ':')
+                print('calibration time:', datetime.fromtimestamp(int.from_bytes(data[32:40], 'little')))
+            channels_count: int = int.from_bytes(data[40:44], 'little')
+            ranges_count: int = int.from_bytes(data[44:48], 'little')
+            offset: int = 48
+            for r in range(ranges_count):
+                for c in range(channels_count):
+                    if self._verbose:
+                        print(f'for range {r} of channel {c}: ', end='')
+                        print(f'offset is', *struct.unpack_from('<d', data, offset), end=', ')
+                    if target == 1:
+                        self._adc_offsets.extend(struct.unpack_from('<d', data, offset))
+                    elif target == 2:
+                        self._dac_offsets.extend(struct.unpack_from('<d', data, offset))
+                    offset += 8
+                    if self._verbose:
+                        print(f'scale is', *struct.unpack_from('<d', data, offset))
+                    if target == 1:
+                        self._adc_scales.extend(struct.unpack_from('<d', data, offset))
+                    elif target == 2:
+                        self._dac_scales.extend(struct.unpack_from('<d', data, offset))
+                    offset += 8
+            data = data[offset:]
 
     def reset_data_socket(self) -> int:
         self.send_request(0x23, 0, bytes(), 0)
@@ -264,13 +264,13 @@ class E502:
                 return channels_settings, error
             channels_settings.append(ChannelSettings(channel_settings))
 
-    def write_channels_settings_table(self, channels_settings: List[ChannelSettings]):
+    def write_channels_settings_table(self, channels_settings: List[ChannelSettings]) -> None:
         self._settings = channels_settings[:]
         self.write_register(0x300, len(channels_settings) - 1)
         for channel, channel_settings in enumerate(channels_settings):
             self.write_register(0x200 + 4 * (len(channels_settings) - channel - 1), int(channel_settings))
 
-    def write_analog(self, index: int, value: float):
+    def write_analog(self, index: int, value: float) -> None:
         if not self._dac_scales:
             self.calibration_data()
         if not (0 <= index < len(self._dac_scales)):
@@ -282,7 +282,7 @@ class E502:
             payload,
             0)
 
-    def write_digital(self, index: int, on: bool):
+    def write_digital(self, index: int, on: bool) -> None:
         if not (0 <= index < len(self._digital_out)):
             raise ValueError('Invalid digital output')
         self._digital_out[index] = on
@@ -291,23 +291,23 @@ class E502:
             sum((1 << i) for i, v in enumerate(self._digital_out) if v),
             0)
 
-    def preload_adc(self):
+    def preload_adc(self) -> None:
         self.write_register(0x30C, 1)
         self.write_register(0x30C, 1)  # by design, not an error
 
-    def set_sync_io(self, running: bool):
+    def set_sync_io(self, running: bool) -> None:
         self.write_register(0x30A, running)
 
-    def enable_in_stream(self, from_adc: bool = False, from_digital_inputs: bool = False):
+    def enable_in_stream(self, from_adc: bool = False, from_digital_inputs: bool = False) -> None:
         self.write_register(0x419, int(from_adc) + int(from_digital_inputs) * 2)
 
-    def set_adc_frequency_divider(self, new_value: int):
+    def set_adc_frequency_divider(self, new_value: int) -> None:
         if new_value <= 0:
             raise ValueError('Invalid ADC frequency divider')
         self.write_register(0x302, new_value - 1)
         self.write_register(0x412, new_value - 1)
 
-    def set_digital_lines_frequency_divider(self, new_value: int):
+    def set_digital_lines_frequency_divider(self, new_value: int) -> None:
         if new_value <= 0:
             raise ValueError('Invalid digital lines frequency divider')
         self.write_register(0x306, new_value - 1)
