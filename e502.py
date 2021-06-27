@@ -20,6 +20,10 @@ import numpy as np
 from channel_settings import ChannelSettings
 from hardware_info import HardwareInfo
 
+__all__ = ['E502', 'X502_ADC_FREQ_DIV_MAX']
+
+X502_ADC_FREQ_DIV_MAX: Final[int] = 1 << 20
+
 
 class E502:
     def __init__(self, ip: str, verbose: bool = False) -> None:
@@ -254,10 +258,13 @@ class E502:
         return response
 
     def read_channels_settings_table(self) -> Tuple[List[ChannelSettings], int]:
+        channels_count: int
+        error: int
         channels_count, error = self.read_int(0x300)
         channels_settings: List[ChannelSettings] = []
         if error:
             return channels_settings, error
+        channel: int
         for channel in range(channels_count + 1):
             channel_settings, error = self.read_int(0x200 + 4 * (channels_count - channel - 1))
             if error:
@@ -267,6 +274,8 @@ class E502:
     def write_channels_settings_table(self, channels_settings: List[ChannelSettings]) -> None:
         self._settings = channels_settings[:]
         self.write_register(0x300, len(channels_settings) - 1)
+        channel: int
+        channel_settings: ChannelSettings
         for channel, channel_settings in enumerate(channels_settings):
             self.write_register(0x200 + 4 * (len(channels_settings) - channel - 1), int(channel_settings))
 
@@ -302,7 +311,7 @@ class E502:
         self.write_register(0x419, int(from_adc) + int(from_digital_inputs) * 2)
 
     def set_adc_frequency_divider(self, new_value: int) -> None:
-        if new_value <= 0:
+        if not (1 <= new_value <= X502_ADC_FREQ_DIV_MAX):
             raise ValueError('Invalid ADC frequency divider')
         self.write_register(0x302, new_value - 1)
         self.write_register(0x412, new_value - 1)
