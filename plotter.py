@@ -6,13 +6,13 @@ from typing import Dict, List, Optional, Set, Union
 import numpy as np
 import pyqtgraph as pg
 from PySide6.QtCore import QSettings, QTimer, Qt, Signal
-from PySide6.QtGui import QCloseEvent, QValidator
+from PySide6.QtGui import QCloseEvent, QValidator, QColor
 from PySide6.QtWidgets import QApplication, QFormLayout, QGroupBox, QHBoxLayout, QLineEdit, \
     QMainWindow, \
     QPushButton, QSpinBox, QTabWidget, QVBoxLayout, QWidget
 
 from channel_settings import ChannelSettings
-from e502 import E502
+from e502 import E502, X502_ADC_FREQ_DIV_MAX
 
 
 class Measurement(Process):
@@ -62,8 +62,10 @@ class IPAddressValidator(QValidator):
 
 class ChannelSettingsGUI(QGroupBox, ChannelSettings):
     channelChanged: Signal = Signal(int, name='channelChanged')
+    colorChanged: Signal = Signal(QColor, name='colorChanged')
 
     def __init__(self) -> None:
+        # TODO: restore state using parent settings
         QGroupBox.__init__(self, 'Enabled')
         ChannelSettings.__init__(self)
 
@@ -92,11 +94,15 @@ class ChannelSettingsGUI(QGroupBox, ChannelSettings):
         self.spin_averaging.valueChanged.connect(self.on_spin_averaging_changed)
         self.averaging = self.spin_averaging.value()
 
+        self.color_button: pg.ColorButton = pg.ColorButton(self)
+        self.color_button.sigColorChanged.connect(lambda sender: self.colorChanged.emit(sender.color()))
+
         self.setLayout(QFormLayout())
         self.layout().addRow('Range', self.combo_range)
         self.layout().addRow('Channel', self.spin_channel)
         self.layout().addRow('Mode', self.combo_mode)
         self.layout().addRow('Averaging', self.spin_averaging)
+        self.layout().addRow('Line Color', self.color_button)
 
     def on_combo_range_changed(self, _index: int) -> None:
         self.range = self.combo_range.value()
@@ -130,17 +136,21 @@ class GUI(QMainWindow):
         self.parameters_layout: QFormLayout = QFormLayout(self.parameters_box)
         self.buttons_layout: QHBoxLayout = QHBoxLayout()
 
-        self.figure: pg.PlotWidget = pg.PlotWidget(self.central_widget)
-        self.plot_line: pg.PlotDataItem = self.figure.plot(np.empty(0), name='')
+        self.plot: pg.PlotWidget = pg.PlotWidget(self.central_widget)
+        self.canvas: pg.PlotItem = self.plot.getPlotItem()
+        self.plot_lines: List[pg.PlotDataItem] = []
 
         self.text_ip_address: QLineEdit = QLineEdit(self.parameters_box)
         self.spin_sample_rate: pg.SpinBox = pg.SpinBox(self.parameters_box)
         self.spin_duration: pg.SpinBox = pg.SpinBox(self.parameters_box)
-        self.spin_portion_size: pg.SpinBox = pg.SpinBox(self.parameters_box)
-        self.spin_frequency_divider: pg.SpinBox = pg.SpinBox(self.parameters_box)
+        self.spin_portion_size: QSpinBox = QSpinBox(self.parameters_box)
+        self.spin_frequency_divider: QSpinBox = QSpinBox(self.parameters_box)
 
         self.tabs: QTabWidget = QTabWidget(self.central_widget)
         self.tab: List[ChannelSettingsGUI] = [ChannelSettingsGUI() for _ in range(8)]
+        t: ChannelSettingsGUI
+        for i, t in enumerate(self.tab):
+            t.color_button.setColor(pg.intColor(i, hues=len(self.tab)))
 
         self.button_start: QPushButton = QPushButton(self.central_widget)
         self.button_stop: QPushButton = QPushButton(self.central_widget)
@@ -173,24 +183,15 @@ class GUI(QMainWindow):
             'bounds': (1.0, np.inf)
         }
         self.spin_duration.setOpts(**opts)
-        opts = {
-            'suffix': '',
-            'siPrefix': False,
-            'decimals': 0,
-            'dec': True,
-            'compactHeight': False,
-            'minStep': 1,
-            'format': '{value:.{decimals}f}{suffixGap}{suffix}',
-            'bounds': (1, np.inf)
-        }
-        self.spin_portion_size.setOpts(**opts)
-        self.spin_frequency_divider.setOpts(**opts)
+
+        self.spin_portion_size.setRange(1, 65535)
+        self.spin_frequency_divider.setRange(1, X502_ADC_FREQ_DIV_MAX)
 
         self.text_ip_address.setValidator(IPAddressValidator())
 
-        self.figure.setFocusPolicy(Qt.ClickFocus)
+        self.plot.setFocusPolicy(Qt.ClickFocus)
 
-        self.main_layout.addWidget(self.figure)
+        self.main_layout.addWidget(self.plot)
         self.main_layout.addLayout(self.controls_layout)
         self.controls_layout.addWidget(self.parameters_box)
         self.controls_layout.addWidget(self.tabs)
@@ -215,6 +216,9 @@ class GUI(QMainWindow):
 
         self.setCentralWidget(self.central_widget)
 
+        any_channel_active: bool = any(t.isChecked() for t in self.tab)
+        self.button_start.setEnabled(any_channel_active)
+
     def setup_actions(self) -> None:
         self.button_start.clicked.connect(self.on_button_start_clicked)
         self.button_stop.clicked.connect(self.on_button_stop_clicked)
@@ -223,6 +227,7 @@ class GUI(QMainWindow):
         for index in range(8):
             self.tab[index].channelChanged.connect(self.on_tab_channel_changed)
             self.tab[index].toggled.connect(self.on_tab_toggled)
+            self.tab[index].colorChanged.connect(self.on_tab_color_changed)
 
     def load_settings(self) -> None:
         self.restoreGeometry(self.settings.value('windowGeometry', b''))
@@ -277,6 +282,9 @@ class GUI(QMainWindow):
                 tab.setChecked(False)
 
     def on_tab_toggled(self, on: bool) -> None:
+        any_channel_active: bool = any(t.isChecked() for t in self.tab)
+        self.button_start.setEnabled(any_channel_active)
+        self.button_stop.setDisabled(any_channel_active)
         if not on:
             return
         other_channels: Set[int] = set()
@@ -287,6 +295,11 @@ class GUI(QMainWindow):
         self.sender().spin_channel.setValue(min(set(list(range(self.sender().spin_channel.minimum() - 1,
                                                                self.sender().spin_channel.maximum())))
                                                 .difference(other_channels)) + 1)
+
+    def on_tab_color_changed(self, color: QColor) -> None:
+        for line, tab in zip(self.plot_lines, self.tab):
+            if self.sender() is tab:
+                line.setPen(color)
 
 
 class App(GUI):
@@ -302,10 +315,16 @@ class App(GUI):
 
     def on_button_start_clicked(self) -> None:
         super(App, self).on_button_start_clicked()
+        active_settings: List[ChannelSettingsGUI] = [t for t in self.tab if t.isChecked()]
+        self.canvas.clearPlots()
+        self.plot_lines = [self.canvas.plot([], [],
+                                            name=f'{t.physical_channel}',
+                                            pen=t.color_button.color())
+                           for t in active_settings]
         self.timer.start(10)
         self.measurement = Measurement(self.requests_queue, self.results_queue,
                                        ip_address=self.text_ip_address.text(),
-                                       settings=self.tab,
+                                       settings=active_settings,
                                        adc_frequency_divider=self.spin_frequency_divider.value(),
                                        data_portion_size=self.spin_portion_size.value())
         self.measurement.start()
@@ -318,9 +337,11 @@ class App(GUI):
         super(App, self).on_button_stop_clicked()
 
     def on_timeout(self) -> None:
-        if not self.results_queue.empty():
-            # TODO: draw several lines of different colors versa point number
-            self.plot_line.setData(self.results_queue.get())
+        while not self.results_queue.empty():
+            data: np.ndarray = self.results_queue.get()
+            ch: int
+            for ch, line in zip(range(data.shape[1]), self.plot_lines):
+                line.setData(data[..., ch])
 
 
 if __name__ == '__main__':
