@@ -1,6 +1,7 @@
 # coding: utf-8
 import sys
 from multiprocessing import Process, Queue
+from pathlib import Path
 from typing import Dict, List, Optional, Set, Union, Type
 
 import numpy as np
@@ -9,11 +10,10 @@ from PySide6.QtCore import QSettings, QTimer, Qt, Signal
 from PySide6.QtGui import QCloseEvent, QValidator, QColor
 from PySide6.QtWidgets import QApplication, QFormLayout, QGroupBox, QHBoxLayout, QLineEdit, \
     QMainWindow, \
-    QPushButton, QSpinBox, QTabWidget, QVBoxLayout, QWidget
+    QPushButton, QSpinBox, QTabWidget, QVBoxLayout, QWidget, QSizePolicy
 
 from channel_settings import ChannelSettings
 from e502 import E502, X502_ADC_FREQ_DIV_MAX
-
 
 try:
     from typing import Final
@@ -71,6 +71,31 @@ class IPAddressValidator(QValidator):
             return QValidator.State.Invalid
         else:
             return QValidator.State.Acceptable
+
+
+class FilePathEntry(QWidget):
+    def __init__(self, parent: Optional[QWidget] = None):
+        super().__init__(parent)
+
+        self.path: Optional[Path] = None
+
+        self.setLayout(QHBoxLayout())
+
+        self.text: QLineEdit = QLineEdit(self)
+        # TODO: on the text change,
+        #  • validate the entered path and
+        #  • indicate somehow if it is invalid
+        self.layout().addWidget(self.text)
+
+        self.browse_button: QPushButton = QPushButton('Browse…', self)
+        # TODO: on the button click,
+        #  • open a file dialog,
+        #  • store the result in `path` variable,
+        #  • display the result in the text box,
+        #  • set the text box tooltip to the box content in case the box is too small for the path
+        self.layout().addWidget(self.browse_button)
+
+        self.layout().setStretch(1, 0)
 
 
 class ChannelSettingsGUI(QGroupBox, ChannelSettings):
@@ -150,11 +175,17 @@ class ChannelSettingsGUI(QGroupBox, ChannelSettings):
         self.color_button.sigColorChanged.connect(self.on_color_changed)
 
         self.setLayout(QFormLayout())
-        self.layout().addRow('Range', self.combo_range)
-        self.layout().addRow('Channel', self.spin_channel)
-        self.layout().addRow('Mode', self.combo_mode)
-        self.layout().addRow('Averaging', self.spin_averaging)
-        self.layout().addRow('Line Color', self.color_button)
+        layout: QFormLayout = self.layout()
+        layout.addRow('Range:', self.combo_range)
+        layout.addRow('Channel:', self.spin_channel)
+        layout.addRow('Mode:', self.combo_mode)
+        layout.addRow('Averaging:', self.spin_averaging)
+        layout.addRow('Line Color:', self.color_button)
+        layout.addRow('Data File:', FilePathEntry(self))
+        r: int
+        for r in range(layout.rowCount()):
+            layout.itemAt(r, QFormLayout.LabelRole).widget().setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+            layout.itemAt(r, QFormLayout.LabelRole).widget().setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
 
         self.settings.endArray()
 
@@ -283,11 +314,11 @@ class GUI(QMainWindow):
         self.controls_layout.addWidget(self.tabs)
         self.controls_layout.addLayout(self.buttons_layout)
 
-        self.parameters_layout.addRow('IP Address', self.text_ip_address)
-        self.parameters_layout.addRow('Sample Rate', self.spin_sample_rate)
-        self.parameters_layout.addRow('Measurement Duration', self.spin_duration)
-        self.parameters_layout.addRow('Portion Size', self.spin_portion_size)
-        self.parameters_layout.addRow('Sync Input Frequency Divider', self.spin_frequency_divider)
+        self.parameters_layout.addRow('IP Address:', self.text_ip_address)
+        self.parameters_layout.addRow('Sample Rate:', self.spin_sample_rate)
+        self.parameters_layout.addRow('Measurement Duration:', self.spin_duration)
+        self.parameters_layout.addRow('Portion Size:', self.spin_portion_size)
+        self.parameters_layout.addRow('Sync Input Frequency Divider:', self.spin_frequency_divider)
 
         index: int
         for index in range(8):
@@ -428,6 +459,9 @@ class App(GUI):
             ch: int
             for ch, line in zip(range(data.shape[1]), self.plot_lines):
                 line.setData(data[..., ch])
+                # TODO:
+                #  • display not only one data junk but the whole trend, up to the specified length,
+                #  • store the received data into the specified files (if a path is given)
 
 
 if __name__ == '__main__':
