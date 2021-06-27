@@ -13,6 +13,10 @@ except ImportError:
 
     Final = _Final()
 
+__all__ = ['ChannelSettings', 'X502_LCH_AVG_SIZE_MAX']
+
+X502_LCH_AVG_SIZE_MAX: Final[int] = 128
+
 
 class ChannelSettings:
     """
@@ -102,7 +106,7 @@ class ChannelSettings:
 
     @averaging.setter
     def averaging(self, new_value: int):
-        if 1 <= new_value <= 128:
+        if 1 <= new_value <= X502_LCH_AVG_SIZE_MAX:
             self._ch_averaging = new_value
         else:
             raise ValueError('Invalid channel averaging')
