@@ -7,7 +7,7 @@ except ImportError:
     # stub
     class _Final:
         @staticmethod
-        def __getitem__(item: Type) -> Type:
+        def __getitem__(item: type) -> type:
             return item
 
 
@@ -65,47 +65,49 @@ class ChannelSettings:
             self._ch_averaging = ((data >> 9) & 0x7f) + 1
 
     @property
-    def range(self) -> int:
+    def range(self) -> Optional[int]:
         return self._range
 
     @range.setter
-    def range(self, new_value: int):
+    def range(self, new_value: int) -> None:
         if 0 <= new_value <= 5:
             self._range = new_value
         else:
             raise ValueError('Invalid channel range')
 
     def range_value(self) -> float:
+        if self._range is None:
+            raise RuntimeError('ADC range has not been specified yet')
         return self.VOLTAGE_RANGE[self._range]
 
     @property
-    def physical_channel(self) -> int:
+    def physical_channel(self) -> Optional[int]:
         return self._phy_ch
 
     @physical_channel.setter
-    def physical_channel(self, new_value: int):
+    def physical_channel(self, new_value: int) -> None:
         if 0 <= new_value <= 15:
             self._phy_ch = new_value
         else:
             raise ValueError('Invalid physical channel number')
 
     @property
-    def mode(self) -> int:
+    def mode(self) -> Optional[int]:
         return self._ch_mode
 
     @mode.setter
-    def mode(self, new_value: int):
+    def mode(self, new_value: int) -> None:
         if 0 <= new_value <= 3:
             self._ch_mode = new_value
         else:
             raise ValueError('Invalid channel mode')
 
     @property
-    def averaging(self) -> int:
+    def averaging(self) -> Optional[int]:
         return self._ch_averaging
 
     @averaging.setter
-    def averaging(self, new_value: int):
+    def averaging(self, new_value: int) -> None:
         if 1 <= new_value <= X502_LCH_AVG_SIZE_MAX:
             self._ch_averaging = new_value
         else:

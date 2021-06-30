@@ -10,7 +10,7 @@ except ImportError:
     # stub
     class _Final:
         @staticmethod
-        def __getitem__(item: Type) -> Type:
+        def __getitem__(item: type) -> type:
             return item
 
     Final = _Final()
@@ -270,6 +270,7 @@ class E502:
             if error:
                 return channels_settings, error
             channels_settings.append(ChannelSettings(channel_settings))
+        return channel_settings, 0
 
     def write_channels_settings_table(self, channels_settings: List[ChannelSettings]) -> None:
         self._settings = channels_settings[:]

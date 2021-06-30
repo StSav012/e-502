@@ -12,7 +12,7 @@ class HardwareInfo:
         self._fpga_version: Optional[Tuple[int, int]] = None
         self.fill_from_bytes(data)
 
-    def fill_from_bytes(self, data: bytes):
+    def fill_from_bytes(self, data: bytes) -> None:
         if not isinstance(data, bytes):
             raise TypeError('The data should be bytes')
         if len(data) == 4:
@@ -36,16 +36,16 @@ class HardwareInfo:
             'DAC is' + '' if self._has_dac else ' not' + ' present',
             'Galvanic decoupling is' + '' if self._has_galvanic_decoupling else ' not' + ' present',
             'BlackFin is' + '' if self._has_black_fin else ' not' + ' present',
-            'PLDA version:', self._plda_version,
-            'Board revision:', self._board_revision,
-            f'FPGA version: {self._fpga_version[0]}.{self._fpga_version[1]}',
+            f'PLDA version: {self._plda_version}',
+            f'Board revision: {self._board_revision}',
+            f'FPGA version: {self._fpga_version[0]}.{self._fpga_version[1]}' if self._fpga_version is not None else '',
         ))
 
     def __str__(self) -> str:
         return '-'.join((
-            'XP'[self._has_black_fin],
+            'XP'[bool(self._has_black_fin)],
             'EU',
-            'XD'[self._has_dac]
+            'XD'[bool(self._has_dac)]
         ))
 
     @property
