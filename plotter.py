@@ -5,12 +5,12 @@ from __future__ import annotations
 import sys
 from multiprocessing import Process, Queue
 from pathlib import Path
-from typing import Dict, Iterable, List, Optional, Set, TextIO, Tuple, Union, Type, cast
+from typing import Dict, Iterable, List, Optional, Set, TextIO, Tuple, Union, cast, Iterator, Sequence
 
 import numpy as np
 import pathvalidate
 import pyqtgraph as pg  # type: ignore
-from PySide6.QtCore import QSettings, QTimer, Qt, Signal
+from PySide6.QtCore import QSettings, QTimer, Qt, Signal, QByteArray
 from PySide6.QtGui import QCloseEvent, QColor, QValidator, QPalette, QPaintEvent
 from PySide6.QtWidgets import QApplication, QFileDialog, QFormLayout, QGroupBox, QHBoxLayout, QLabel, QLineEdit, \
     QMainWindow, QPushButton, QSizePolicy, QSpinBox, QStyle, QTabWidget, QVBoxLayout, QWidget
@@ -38,21 +38,21 @@ except ImportError:
     # stub
     class _Literal:
         @staticmethod
-        def __getitem__(*items: Any) -> type:
+        def __getitem__(*items: Any) -> object:
             return type(items[0]) if items else Any
 
 
     Literal = _Literal()
 
 
-FileWritingMode: Union[Type[str], type] = Literal['w', 'w+', '+w', 'wt', 'tw', 'wt+', 'w+t', '+wt', 'tw+', 't+w', '+tw',
-                                                  'a', 'a+', '+a', 'at', 'ta', 'at+', 'a+t', '+at', 'ta+', 't+a', '+ta',
-                                                  'x', 'x+', '+x', 'xt', 'tx', 'xt+', 'x+t', '+xt', 'tx+', 't+x', '+tx']
+FileWritingMode = Literal['w', 'w+', '+w', 'wt', 'tw', 'wt+', 'w+t', '+wt', 'tw+', 't+w', '+tw',
+                          'a', 'a+', '+a', 'at', 'ta', 'at+', 'a+t', '+at', 'ta+', 't+a', '+ta',
+                          'x', 'x+', '+x', 'xt', 'tx', 'xt+', 'x+t', '+xt', 'tx+', 't+x', '+tx']
 
 
 class Measurement(Process):
     def __init__(self, results_queue: Queue[np.ndarray],
-                 ip_address: str, settings: List[ChannelSettings], adc_frequency_divider: int,
+                 ip_address: str, settings: Sequence[ChannelSettings], adc_frequency_divider: int,
                  data_portion_size: int, digital_lines: DigitalLinesGUI) -> None:
         super(Measurement, self).__init__()
         self.results_queue: Queue[np.ndarray] = results_queue
@@ -180,7 +180,7 @@ class ChannelSettingsGUI(QGroupBox, ChannelSettings):
 
         self.setCheckable(True)
         try:
-            self.setChecked(self._count < settings_length and self.settings.value('enabled', False, bool))
+            self.setChecked(self._count < settings_length and cast(bool, self.settings.value('enabled', False, bool)))
         except SystemError:
             self.setChecked(False)
         self.toggled.connect(self.on_toggled)
@@ -214,7 +214,7 @@ class ChannelSettingsGUI(QGroupBox, ChannelSettings):
             self.spin_channel.setRange(1, 16)
         try:
             if self._count < settings_length:
-                self.spin_channel.setValue(self.settings.value('channel', 0, int) + 1)
+                self.spin_channel.setValue(cast(int, self.settings.value('channel', 0, int)) + 1)
         except SystemError:
             pass
         self.spin_channel.valueChanged.connect(self.on_spin_channel_changed)
@@ -224,7 +224,7 @@ class ChannelSettingsGUI(QGroupBox, ChannelSettings):
         self.spin_averaging.setRange(1, 128)
         try:
             if self._count < settings_length:
-                self.spin_averaging.setValue(self.settings.value('averaging', 1, int))
+                self.spin_averaging.setValue(cast(int, self.settings.value('averaging', 1, int)))
         except SystemError:
             pass
         self.spin_averaging.valueChanged.connect(self.on_spin_averaging_changed)
@@ -233,12 +233,13 @@ class ChannelSettingsGUI(QGroupBox, ChannelSettings):
         self.color_button: pg.ColorButton = pg.ColorButton(self)
         try:
             if self._count < settings_length:
-                self.spin_averaging.setValue(self.settings.value('lineColor', Qt.GlobalColor.lightGray, QColor))
+                self.color_button.setColor(self.settings.value('lineColor', QColor(Qt.GlobalColor.lightGray), QColor))
         except SystemError:
             pass
         self.color_button.sigColorChanged.connect(self.on_color_changed)
 
-        self.saving_location: FilePathEntry = FilePathEntry(self.settings.value('savingLocation', '', str), self)
+        self.saving_location: FilePathEntry = FilePathEntry(cast(str, self.settings.value('savingLocation', '', str)),
+                                                            self)
 
         self.setLayout(QFormLayout())
         layout: QFormLayout = self.layout()
@@ -369,7 +370,7 @@ class DigitalLinesGUI(QGroupBox):
         else:
             raise IndexError
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[bool]:
         b: QPushButton
         for b in self.buttons:
             yield b.isChecked()
@@ -401,6 +402,7 @@ class GUI(QMainWindow):
 
         self.tabs_container: QTabWidget = QTabWidget(self.central_widget)
         self.tabs: List[ChannelSettingsGUI] = [ChannelSettingsGUI(self.settings) for _ in range(8)]
+        i: int
         t: ChannelSettingsGUI
         for i, t in enumerate(self.tabs):
             t.color_button.setColor(pg.intColor(i, hues=len(self.tabs)))
@@ -437,7 +439,7 @@ class GUI(QMainWindow):
         }
         self.spin_duration.setOpts(**opts)
 
-        self.spin_portion_size.setRange(1, 65535)
+        self.spin_portion_size.setRange(1, 1_000_000)
         self.spin_frequency_divider.setRange(1, X502_ADC_FREQ_DIV_MAX)
 
         self.text_ip_address.setValidator(IPAddressValidator())
@@ -460,9 +462,10 @@ class GUI(QMainWindow):
         self.parameters_layout.addRow('Portion Size:', self.spin_portion_size)
         self.parameters_layout.addRow('Sync Input Frequency Divider:', self.spin_frequency_divider)
 
-        index: int
-        for index in range(8):
-            self.tabs_container.addTab(self.tabs[index], str(index + 1))
+        i: int
+        t: ChannelSettingsGUI
+        for i, t in enumerate(self.tabs):
+            self.tabs_container.addTab(t, str(i + 1))
 
         self.buttons_layout.addWidget(self.button_start)
         self.buttons_layout.addWidget(self.button_stop)
@@ -487,21 +490,21 @@ class GUI(QMainWindow):
             self.tabs[index].colorChanged.connect(self.on_tab_color_changed)
 
     def load_settings(self) -> None:
-        self.restoreGeometry(self.settings.value('windowGeometry', b''))
-        self.restoreState(self.settings.value('windowState', b''))
+        self.restoreGeometry(cast(QByteArray, self.settings.value('windowGeometry', QByteArray(), QByteArray)))
+        self.restoreState(cast(QByteArray, self.settings.value('windowState', QByteArray(), QByteArray)))
 
         self.settings.beginGroup('parameters')
-        self.text_ip_address.setText(self.settings.value('ipAddress', '192.168.0.1', str))
-        self.spin_sample_rate.setValue(self.settings.value('sampleRate', 2e6, float))
-        self.spin_duration.setValue(self.settings.value('measurementDuration', 60.0, float))
-        self.spin_portion_size.setValue(self.settings.value('samplesPortionSize', 1000, int))
-        self.spin_frequency_divider.setValue(self.settings.value('frequencyDivider', 1, int))
+        self.text_ip_address.setText(cast(str, self.settings.value('ipAddress', '192.168.0.1', str)))
+        self.spin_sample_rate.setValue(cast(float, self.settings.value('sampleRate', 2e6, float)))
+        self.spin_duration.setValue(cast(float, self.settings.value('measurementDuration', 60.0, float)))
+        self.spin_portion_size.setValue(cast(int, self.settings.value('samplesPortionSize', 1000, int)))
+        self.spin_frequency_divider.setValue(cast(int, self.settings.value('frequencyDivider', 1, int)))
         self.settings.endGroup()
 
         i: int
         for i in range(self.settings.beginReadArray('digitalLines')):
             self.settings.setArrayIndex(i)
-            self.digital_lines[i + 1] = self.settings.value('pushed', False,  bool)
+            self.digital_lines[i + 1] = cast(bool, self.settings.value('pushed', False,  bool))
         self.settings.endArray()
 
     def save_settings(self) -> None:
@@ -518,9 +521,10 @@ class GUI(QMainWindow):
 
         self.settings.beginWriteArray('digitalLines', len(self.digital_lines))
         i: int
-        for i in range(len(self.digital_lines)):
+        on: bool
+        for i, on in enumerate(self.digital_lines):
             self.settings.setArrayIndex(i)
-            self.settings.setValue('pushed', self.digital_lines[i + 1])
+            self.settings.setValue('pushed', on)
         self.settings.endArray()
 
         self.settings.sync()

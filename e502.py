@@ -2,7 +2,7 @@
 import socket
 import struct
 from datetime import datetime
-from typing import Union, Tuple, List, Type, Optional
+from typing import Union, Tuple, List, Optional, Sequence
 
 try:
     from typing import Final as Final
@@ -257,7 +257,7 @@ class E502:
         self._data_socket.connect((self._ip, 11115))
         return response
 
-    def read_channels_settings_table(self) -> Tuple[List[ChannelSettings], int]:
+    def read_channels_settings_table(self) -> Tuple[Sequence[ChannelSettings], int]:
         channels_count: int
         error: int
         channels_count, error = self.read_int(0x300)
@@ -270,9 +270,9 @@ class E502:
             if error:
                 return channels_settings, error
             channels_settings.append(ChannelSettings(channel_settings))
-        return channel_settings, 0
+        return channels_settings, 0
 
-    def write_channels_settings_table(self, channels_settings: List[ChannelSettings]) -> None:
+    def write_channels_settings_table(self, channels_settings: Sequence[ChannelSettings]) -> None:
         self._settings = channels_settings[:]
         self.write_register(0x300, len(channels_settings) - 1)
         channel: int
