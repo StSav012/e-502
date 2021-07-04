@@ -1,14 +1,17 @@
 # coding: utf-8
+
+from __future__ import annotations
+
 import sys
 from multiprocessing import Process, Queue
 from pathlib import Path
-from typing import Dict, Iterable, List, Optional, Set, TextIO, Tuple, Union
+from typing import Dict, Iterable, List, Optional, Set, TextIO, Tuple, Union, Type, cast
 
 import numpy as np
 import pathvalidate
 import pyqtgraph as pg  # type: ignore
 from PySide6.QtCore import QSettings, QTimer, Qt, Signal
-from PySide6.QtGui import QCloseEvent, QColor, QValidator
+from PySide6.QtGui import QCloseEvent, QColor, QValidator, QPalette, QPaintEvent
 from PySide6.QtWidgets import QApplication, QFileDialog, QFormLayout, QGroupBox, QHBoxLayout, QLabel, QLineEdit, \
     QMainWindow, QPushButton, QSizePolicy, QSpinBox, QStyle, QTabWidget, QVBoxLayout, QWidget
 
@@ -31,6 +34,7 @@ try:
     from typing import Literal
 except ImportError:
     from typing import Any
+
     # stub
     class _Literal:
         @staticmethod
@@ -41,10 +45,15 @@ except ImportError:
     Literal = _Literal()
 
 
+FileWritingMode: Union[Type[str], type] = Literal['w', 'w+', '+w', 'wt', 'tw', 'wt+', 'w+t', '+wt', 'tw+', 't+w', '+tw',
+                                                  'a', 'a+', '+a', 'at', 'ta', 'at+', 'a+t', '+at', 'ta+', 't+a', '+ta',
+                                                  'x', 'x+', '+x', 'xt', 'tx', 'xt+', 'x+t', '+xt', 'tx+', 't+x', '+tx']
+
+
 class Measurement(Process):
     def __init__(self, results_queue: Queue[np.ndarray],
                  ip_address: str, settings: List[ChannelSettings], adc_frequency_divider: int,
-                 data_portion_size: int) -> None:
+                 data_portion_size: int, digital_lines: DigitalLinesGUI) -> None:
         super(Measurement, self).__init__()
         self.results_queue: Queue[np.ndarray] = results_queue
 
@@ -53,6 +62,7 @@ class Measurement(Process):
         self.device.set_adc_frequency_divider(adc_frequency_divider)
 
         self.data_portion_size: int = data_portion_size
+        self.digital_lines: DigitalLinesGUI = digital_lines
 
     def terminate(self) -> None:
         self.device.set_sync_io(False)
@@ -61,6 +71,11 @@ class Measurement(Process):
         super(Measurement, self).terminate()
 
     def run(self) -> None:
+        i: int
+        on: bool
+        for i, on in enumerate(self.digital_lines):
+            self.device.write_digital(i, on)
+
         self.device.enable_in_stream(from_adc=True)
         self.device.start_data_stream()
         self.device.preload_adc()
@@ -291,6 +306,75 @@ class ChannelSettingsGUI(QGroupBox, ChannelSettings):
         self.colorChanged.emit(sender.color())
 
 
+class ToggleButton(QPushButton):
+    def __init__(self, color: Union[Qt.GlobalColor, QColor],
+                 title: str = '', parent: Optional[QWidget] = None) -> None:
+        if title:
+            super().__init__(title, parent)
+        else:
+            super().__init__(parent)
+
+        self._color: QColor = QColor(color)
+        self._orig_palette: QPalette = self.palette()
+
+        self.setCheckable(True)
+        self.setAutoFillBackground(True)
+
+    def paintEvent(self, ev: QPaintEvent):
+        if self.isChecked():
+            pal: QPalette = self.palette()
+            color: QColor
+            color = self._color
+            pal.setColor(QPalette.ColorGroup.Disabled, QPalette.ColorRole.Button, color)
+            pal.setColor(QPalette.ColorGroup.Disabled, QPalette.ColorRole.ButtonText,
+                         QColor('white' if color.lightnessF() < 0.5 else 'black'))
+            color = QColor.fromHslF(self._color.hueF(),
+                                    self._color.saturationF(),
+                                    self._color.lightnessF() * 0.5)
+            pal.setColor(QPalette.ColorGroup.Normal, QPalette.ColorRole.Button, color)
+            pal.setColor(QPalette.ColorGroup.Normal, QPalette.ColorRole.ButtonText,
+                         QColor('white' if color.lightnessF() < 0.5 else 'black'))
+            self.setPalette(pal)
+        else:
+            self.setPalette(self._orig_palette)
+        super().paintEvent(ev)
+
+
+class DigitalLinesGUI(QGroupBox):
+    def __init__(self, title: str = '', parent: Optional[QWidget] = None) -> None:
+        if title:
+            super().__init__(title, parent)
+        else:
+            super().__init__(parent)
+        layout: QHBoxLayout = QHBoxLayout(self)
+        self.buttons: List[QPushButton] = []
+        i: int
+        for i in range(16):
+            self.buttons.append(ToggleButton(Qt.GlobalColor.darkGreen, str(i + 1), self))
+            self.buttons[-1].setFixedWidth(self.buttons[-1].minimumSizeHint().height())
+            layout.addWidget(self.buttons[-1])
+
+    def __len__(self) -> int:
+        return len(self.buttons)
+
+    def __getitem__(self, index: int) -> bool:
+        if 1 <= index <= len(self):
+            return self.buttons[index - 1].isChecked()
+        else:
+            raise IndexError
+
+    def __setitem__(self, index: int, pushed: bool) -> None:
+        if 1 <= index <= len(self):
+            return self.buttons[index - 1].setChecked(pushed)
+        else:
+            raise IndexError
+
+    def __iter__(self):
+        b: QPushButton
+        for b in self.buttons:
+            yield b.isChecked()
+
+
 class GUI(QMainWindow):
     def __init__(self, flags: Qt.WindowFlags = Qt.WindowFlags()) -> None:
         super(GUI, self).__init__(flags=flags)
@@ -313,6 +397,7 @@ class GUI(QMainWindow):
         self.spin_duration: pg.SpinBox = pg.SpinBox(self.parameters_box)
         self.spin_portion_size: QSpinBox = QSpinBox(self.parameters_box)
         self.spin_frequency_divider: QSpinBox = QSpinBox(self.parameters_box)
+        self.digital_lines: DigitalLinesGUI = DigitalLinesGUI(parent=self.parameters_box)
 
         self.tabs_container: QTabWidget = QTabWidget(self.central_widget)
         self.tabs: List[ChannelSettingsGUI] = [ChannelSettingsGUI(self.settings) for _ in range(8)]
@@ -362,8 +447,12 @@ class GUI(QMainWindow):
         self.main_layout.addWidget(self.plot)
         self.main_layout.addLayout(self.controls_layout)
         self.controls_layout.addWidget(self.parameters_box)
+        self.controls_layout.addWidget(self.digital_lines)
+        self.controls_layout.addStretch(1)
         self.controls_layout.addWidget(self.tabs_container)
         self.controls_layout.addLayout(self.buttons_layout)
+
+        self.digital_lines.setTitle('Digital Lines')
 
         self.parameters_layout.addRow('IP Address:', self.text_ip_address)
         self.parameters_layout.addRow('Sample Rate:', self.spin_sample_rate)
@@ -392,7 +481,7 @@ class GUI(QMainWindow):
         self.button_stop.clicked.connect(self.on_button_stop_clicked)
 
         index: int
-        for index in range(8):
+        for index in range(len(self.tabs)):
             self.tabs[index].channelChanged.connect(self.on_tab_channel_changed)
             self.tabs[index].toggled.connect(self.on_tab_toggled)
             self.tabs[index].colorChanged.connect(self.on_tab_color_changed)
@@ -409,6 +498,12 @@ class GUI(QMainWindow):
         self.spin_frequency_divider.setValue(self.settings.value('frequencyDivider', 1, int))
         self.settings.endGroup()
 
+        i: int
+        for i in range(self.settings.beginReadArray('digitalLines')):
+            self.settings.setArrayIndex(i)
+            self.digital_lines[i + 1] = self.settings.value('pushed', False,  bool)
+        self.settings.endArray()
+
     def save_settings(self) -> None:
         self.settings.setValue('windowGeometry', self.saveGeometry())
         self.settings.setValue('windowState', self.saveState())
@@ -421,6 +516,13 @@ class GUI(QMainWindow):
         self.settings.setValue('frequencyDivider', self.spin_frequency_divider.value())
         self.settings.endGroup()
 
+        self.settings.beginWriteArray('digitalLines', len(self.digital_lines))
+        i: int
+        for i in range(len(self.digital_lines)):
+            self.settings.setArrayIndex(i)
+            self.settings.setValue('pushed', self.digital_lines[i + 1])
+        self.settings.endArray()
+
         self.settings.sync()
 
     def closeEvent(self, event: QCloseEvent) -> None:
@@ -430,12 +532,14 @@ class GUI(QMainWindow):
     def on_button_start_clicked(self) -> None:
         self.button_start.setDisabled(True)
         self.parameters_box.setDisabled(True)
+        self.digital_lines.setDisabled(True)
         self.tabs_container.setDisabled(True)
         self.button_stop.setEnabled(True)
 
     def on_button_stop_clicked(self) -> None:
         self.button_stop.setDisabled(True)
         self.parameters_box.setEnabled(True)
+        self.digital_lines.setEnabled(True)
         self.tabs_container.setEnabled(True)
         self.button_start.setEnabled(True)
 
@@ -452,7 +556,6 @@ class GUI(QMainWindow):
     def on_tab_toggled(self, on: bool) -> None:
         any_channel_active: bool = any(t.isChecked() for t in self.tabs)
         self.button_start.setEnabled(any_channel_active)
-        self.button_stop.setDisabled(any_channel_active)
         if not on:
             return
         other_channels: Set[int] = set()
@@ -471,29 +574,25 @@ class GUI(QMainWindow):
 
 
 class FileWriter(Process):
-    def __init__(self, requests_queue: Queue):
+    def __init__(self, requests_queue: Queue[Tuple[Optional[Path], FileWritingMode, np.ndarray]]):
         super(Process, self).__init__()
 
-        self.requests_queue: Queue[Tuple[Path,
-                                         Literal['w', 'w+', '+w', 'wt', 'tw', 'wt+', 'w+t', '+wt', 'tw+', 't+w', '+tw',
-                                                 'a', 'a+', '+a', 'at', 'ta', 'at+', 'a+t', '+at', 'ta+', 't+a', '+ta',
-                                                 'x', 'x+', '+x', 'xt', 'tx', 'xt+', 'x+t', '+xt', 'tx+', 't+x', '+tx'],
-                                         np.ndarray]] = requests_queue
+        self.requests_queue: Queue[Tuple[Optional[Path], FileWritingMode, np.ndarray]] = requests_queue
 
     @property
     def done(self) -> bool:
         return self.requests_queue.empty()
 
     def run(self) -> None:
-        file_path: Path
-        file_mode: Literal['w', 'w+', '+w', 'wt', 'tw', 'wt+', 'w+t', '+wt', 'tw+', 't+w', '+tw',
-                           'a', 'a+', '+a', 'at', 'ta', 'at+', 'a+t', '+at', 'ta+', 't+a', '+ta',
-                           'x', 'x+', '+x', 'xt', 'tx', 'xt+', 'x+t', '+xt', 'tx+', 't+x', '+tx']
+        file_path: Optional[Path]
+        file_mode: FileWritingMode
         x: np.ndarray
         f_out: TextIO
 
         while True:
             file_path, file_mode, x = self.requests_queue.get(block=True)
+            if file_path is None:
+                continue
             with file_path.open(file_mode) as f_out:
                 f_out.writelines((('\t'.join(f'{xii}' for xii in xi)
                                    if isinstance(xi, Iterable)
@@ -509,14 +608,12 @@ class App(GUI):
         self.timer: QTimer = QTimer(self)
         self.timer.timeout.connect(self.on_timeout)
 
-        self.requests_queue: Queue[Tuple[Path,
-                                         Literal['w', 'w+', '+w', 'wt', 'tw', 'wt+', 'w+t', '+wt', 'tw+', 't+w', '+tw',
-                                                 'a', 'a+', '+a', 'at', 'ta', 'at+', 'a+t', '+at', 'ta+', 't+a', '+ta',
-                                                 'x', 'x+', '+x', 'xt', 'tx', 'xt+', 'x+t', '+xt', 'tx+', 't+x', '+tx'],
-                                         np.ndarray]] = Queue()
+        self.requests_queue: Queue[Tuple[Optional[Path], FileWritingMode, np.ndarray]] = Queue()
         self.results_queue: Queue[np.ndarray] = Queue()
         self.measurement: Optional[Measurement] = None
         self.file_writer: Optional[FileWriter] = None
+
+        self._data: List[np.ndarray] = []
 
         self._index_map: List[int] = []
 
@@ -534,12 +631,14 @@ class App(GUI):
                                             name=f'{t.physical_channel}',
                                             pen=t.color_button.color())
                            for t in active_settings]
+        self._data = [np.empty(0) for _ in active_settings]
         self.timer.start(10)
         self.measurement = Measurement(self.results_queue,
                                        ip_address=self.text_ip_address.text(),
                                        settings=active_settings,
                                        adc_frequency_divider=self.spin_frequency_divider.value(),
-                                       data_portion_size=self.spin_portion_size.value())
+                                       data_portion_size=self.spin_portion_size.value(),
+                                       digital_lines=self.digital_lines)
         self.measurement.start()
         self.file_writer = FileWriter(self.requests_queue)
         self.file_writer.start()
@@ -555,14 +654,25 @@ class App(GUI):
         super(App, self).on_button_stop_clicked()
 
     def on_timeout(self) -> None:
+        ch: int
+        d: np.ndarray
+        line: pg.PlotDataItem
+        needs_updating: bool = not self.results_queue.empty()
         while not self.results_queue.empty():
             data: np.ndarray = self.results_queue.get()
-            ch: int
             for ch, line in zip(range(data.shape[1]), self.plot_lines):
-                line.setData(np.concatenate((line.yData, data[..., ch])))
+                channel_data: np.ndarray = data[..., ch]
+                if not channel_data.size:
+                    continue
+                self._data[ch] = np.concatenate((self._data[ch], channel_data))
                 tab_index: int = self._index_map[ch]
-                if self.tabs[tab_index].saving_location:
-                    self.requests_queue.put((self.tabs[tab_index].saving_location, 'at', data[..., ch]))
+                if self.tabs[tab_index].saving_location.path is not None:
+                    self.requests_queue.put((self.tabs[tab_index].saving_location.path,
+                                             cast(FileWritingMode, 'at'),
+                                             channel_data))
+        if needs_updating:
+            for d, line in zip(self._data, self.plot_lines):
+                line.setData(d)
 
 
 if __name__ == '__main__':
