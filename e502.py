@@ -4,21 +4,11 @@ import struct
 from datetime import datetime
 from typing import Union, Tuple, List, Optional, Sequence
 
-try:
-    from typing import Final as Final
-except ImportError:
-    # stub
-    class _Final:
-        @staticmethod
-        def __getitem__(item: type) -> type:
-            return item
-
-    Final = _Final()
-
 import numpy as np
 
 from channel_settings import ChannelSettings
 from hardware_info import HardwareInfo
+from stubs import Final
 
 __all__ = ['E502', 'X502_ADC_FREQ_DIV_MAX']
 

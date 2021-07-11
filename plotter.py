@@ -18,32 +18,7 @@ from PySide6.QtWidgets import QApplication, QFileDialog, QFormLayout, QGroupBox,
 from channel_settings import ChannelSettings
 from e502 import E502, X502_ADC_FREQ_DIV_MAX
 
-try:
-    from typing import Final
-except ImportError:
-    # stub
-    class _Final:
-        @staticmethod
-        def __getitem__(item: type) -> type:
-            return item
-
-
-    Final = _Final()
-
-try:
-    from typing import Literal
-except ImportError:
-    from typing import Any
-
-    # stub
-    class _Literal:
-        @staticmethod
-        def __getitem__(*items: Any) -> object:
-            return type(items[0]) if items else Any
-
-
-    Literal = _Literal()
-
+from stubs import Final, Literal
 
 FileWritingMode = Literal['w', 'w+', '+w', 'wt', 'tw', 'wt+', 'w+t', '+wt', 'tw+', 't+w', '+tw',
                           'a', 'a+', '+a', 'at', 'ta', 'at+', 'a+t', '+at', 'ta+', 't+a', '+ta',

@@ -1,17 +1,7 @@
 # coding: utf-8
-from typing import Union, Dict, Optional, Type
+from typing import Union, Dict, Optional
 
-try:
-    from typing import Final
-except ImportError:
-    # stub
-    class _Final:
-        @staticmethod
-        def __getitem__(item: type) -> type:
-            return item
-
-
-    Final = _Final()
+from stubs import Final
 
 __all__ = ['ChannelSettings', 'X502_LCH_AVG_SIZE_MAX']
 
