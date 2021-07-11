@@ -389,10 +389,6 @@ class GUI(QMainWindow):
         self.parameters_layout: QFormLayout = QFormLayout(self.parameters_box)
         self.buttons_layout: QHBoxLayout = QHBoxLayout()
 
-        self.plot: pg.PlotWidget = pg.PlotWidget(self.central_widget)
-        self.canvas: pg.PlotItem = self.plot.getPlotItem()
-        self.plot_lines: List[pg.PlotDataItem] = []
-
         self.text_ip_address: QLineEdit = QLineEdit(self.parameters_box)
         self.spin_sample_rate: pg.SpinBox = pg.SpinBox(self.parameters_box)
         self.spin_duration: pg.SpinBox = pg.SpinBox(self.parameters_box)
@@ -406,6 +402,10 @@ class GUI(QMainWindow):
         t: ChannelSettingsGUI
         for i, t in enumerate(self.tabs):
             t.color_button.setColor(pg.intColor(i, hues=len(self.tabs)))
+
+        self.plot: pg.GraphicsLayoutWidget = pg.GraphicsLayoutWidget(self.central_widget)
+        self.canvases: List[pg.PlotItem] = [self.plot.addPlot(row=i, col=0) for i in range(len(self.tabs))]
+        self.plot_lines: List[pg.PlotDataItem] = []
 
         self.button_start: QPushButton = QPushButton(self.central_widget)
         self.button_stop: QPushButton = QPushButton(self.central_widget)
@@ -490,8 +490,8 @@ class GUI(QMainWindow):
             self.tabs[index].colorChanged.connect(self.on_tab_color_changed)
 
     def load_settings(self) -> None:
-        self.restoreGeometry(cast(QByteArray, self.settings.value('windowGeometry', QByteArray(), QByteArray)))
-        self.restoreState(cast(QByteArray, self.settings.value('windowState', QByteArray(), QByteArray)))
+        self.restoreGeometry(cast(QByteArray, self.settings.value('windowGeometry', QByteArray())))
+        self.restoreState(cast(QByteArray, self.settings.value('windowState', QByteArray())))
 
         self.settings.beginGroup('parameters')
         self.text_ip_address.setText(cast(str, self.settings.value('ipAddress', '192.168.0.1', str)))
@@ -504,8 +504,17 @@ class GUI(QMainWindow):
         i: int
         for i in range(self.settings.beginReadArray('digitalLines')):
             self.settings.setArrayIndex(i)
-            self.digital_lines[i + 1] = cast(bool, self.settings.value('pushed', False,  bool))
+            self.digital_lines[i + 1] = cast(bool, self.settings.value('pushed', False, bool))
         self.settings.endArray()
+
+        tab: ChannelSettingsGUI
+        checked_tabs_count: int = sum(tab.isChecked() for tab in self.tabs)
+        if checked_tabs_count:
+            i: int
+            c: pg.PlotItem
+            for i, c in enumerate(self.canvases):
+                c.setVisible(i < checked_tabs_count)
+        self.plot.setVisible(checked_tabs_count)
 
     def save_settings(self) -> None:
         self.settings.setValue('windowGeometry', self.saveGeometry())
@@ -560,10 +569,20 @@ class GUI(QMainWindow):
     def on_tab_toggled(self, on: bool) -> None:
         any_channel_active: bool = any(t.isChecked() for t in self.tabs)
         self.button_start.setEnabled(any_channel_active)
+
+        tab: ChannelSettingsGUI
+        checked_tabs_count: int = sum(tab.isChecked() for tab in self.tabs)
+        if checked_tabs_count:
+            i: int
+            c: pg.PlotItem
+            for i, c in enumerate(self.canvases):
+                c.setVisible(i < checked_tabs_count)
+        self.plot.setVisible(checked_tabs_count)
+
         if not on:
             return
+
         other_channels: Set[int] = set()
-        tab: ChannelSettingsGUI
         for tab in self.tabs:
             if tab.isChecked() and tab is not self.sender() and tab.physical_channel is not None:
                 other_channels.add(tab.physical_channel)
@@ -630,11 +649,14 @@ class App(GUI):
             if t.isChecked():
                 self._index_map.append(i)
         active_settings: List[ChannelSettingsGUI] = [t for t in self.tabs if t.isChecked()]
-        self.canvas.clearPlots()
-        self.plot_lines = [self.canvas.plot(np.empty(0),
-                                            name=f'{t.physical_channel}',
-                                            pen=t.color_button.color())
-                           for t in active_settings]
+        c: pg.PlotItem
+        for i, c in enumerate(self.canvases):
+            c.clearPlots()
+            c.setVisible(i < len(active_settings))
+        self.plot_lines = [c.plot(np.empty(0),
+                                  name=f'{t.physical_channel}',
+                                  pen=t.color_button.color())
+                           for c, t in zip(self.canvases, active_settings)]
         self._data = [np.empty(0) for _ in active_settings]
         self.timer.start(10)
         self.measurement = Measurement(self.results_queue,
