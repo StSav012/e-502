@@ -1,27 +1,15 @@
 # coding: utf-8
 from configparser import ConfigParser
 from threading import Thread, Lock
-from typing import List, Type, NamedTuple
+from typing import List, NamedTuple
 
 import numpy as np
 
 from channel_settings import ChannelSettings
 from e502 import E502
+from stubs import Final
 
-try:
-    from typing import Final
-except ImportError:
-    # stub
-    class _Final:
-        @staticmethod
-        def __getitem__(item: Type) -> Type:
-            return item
-
-
-    Final = _Final()
-
-
-QueueRecord = NamedTuple('QueueRecord', file_name=str, file_mode=str, x=np.ndarray, y=np.ndarray)
+QueueRecord = NamedTuple('QueueRecord', file_name=str, file_mode=str, y=np.ndarray)
 
 
 class FileWriter(Thread):
@@ -37,16 +25,16 @@ class FileWriter(Thread):
         self._write_queue()
         self.done = True
 
-    def write_data(self, file_name: str, file_mode: str, x: np.ndarray, y: np.ndarray) -> None:
+    def write_data(self, file_name: str, file_mode: str, y: np.ndarray) -> None:
         with self.lock:
-            self.queue.append(QueueRecord(file_name, file_mode, x, y))
+            self.queue.append(QueueRecord(file_name, file_mode, y))
 
     def _write_queue(self):
         while self.queue:
             with self.lock:
                 qr: QueueRecord = self.queue.pop(0)
             with open(qr.file_name, qr.file_mode) as f_out:
-                f_out.writelines(f'{x}\t{y}\n' for x, y in zip(qr.x, qr.y))
+                f_out.writelines(f'{y}\n' for y in qr.y)
 
     def run(self) -> None:
         while not self.done:
@@ -57,13 +45,15 @@ if __name__ == '__main__':
     def main():
         config: ConfigParser = ConfigParser(inline_comment_prefixes=('#', ';'),
                                             default_section='general')
-        config.read('settings.ini')
+        config.read('settings.ini', encoding='utf-8')
 
         sections = config.sections()
 
-        device: E502 = E502(config.get(config.default_section, 'ip'))
+        device: E502 = E502(config.get(config.default_section, 'ip'), verbose=True)
         measurement_duration: Final[float] = config.getfloat(config.default_section, 'продолжительность измерения')
         portion_size: Final[int] = config.getint(config.default_section, 'размер порции данных')
+
+        device.write_analog(0, 0.0)
 
         settings: List[ChannelSettings] = []
         for section in sections:
@@ -85,17 +75,13 @@ if __name__ == '__main__':
 
         import time
 
-        t0: float = time.monotonic()
         total_data_length: int = 0
         try:
-            while time.monotonic() - t0 <= measurement_duration:
+            while total_data_length / (2e6 * len(sections)) <= measurement_duration:
                 data: np.ndarray = device.get_data(portion_size)
-                # TODO: improve time scale
-                time_scale: np.ndarray = \
-                    (np.arange(data.shape[0], dtype=float) + total_data_length) / (2e6 * len(sections))
                 total_data_length += data.shape[0]
                 for index, section in enumerate(sections):
-                    fw.write_data(section, 'at', time_scale, data[..., index])
+                    fw.write_data(section, 'at', data[..., index])
         except KeyboardInterrupt:
             pass
         device.set_sync_io(False)
