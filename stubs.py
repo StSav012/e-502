@@ -1,10 +1,9 @@
 # coding: utf-8
 import sys
 
-if sys.version_info < (3, 8):
+if sys.version_info >= (3, 8):
     from typing import Final, Literal
 else:
-    # stubs
     from typing import Any
 
     class _Final:
@@ -21,4 +20,9 @@ else:
     Final = _Final()
     Literal = _Literal()
 
-__all__ = ['Final', 'Literal']
+if sys.version_info >= (3, 10):
+    from typing import NoneType
+else:
+    NoneType = type(None)
+
+__all__ = ['Final', 'Literal', 'NoneType']
