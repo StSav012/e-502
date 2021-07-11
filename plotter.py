@@ -10,10 +10,24 @@ from typing import Dict, Iterable, List, Optional, Set, TextIO, Tuple, Union, ca
 import numpy as np
 import pathvalidate
 import pyqtgraph as pg  # type: ignore
-from PySide6.QtCore import QSettings, QTimer, Qt, Signal, QByteArray
-from PySide6.QtGui import QCloseEvent, QColor, QValidator, QPalette, QPaintEvent
-from PySide6.QtWidgets import QApplication, QFileDialog, QFormLayout, QGroupBox, QHBoxLayout, QLabel, QLineEdit, \
-    QMainWindow, QPushButton, QSizePolicy, QSpinBox, QStyle, QTabWidget, QVBoxLayout, QWidget
+if pg.Qt.QT_LIB == pg.Qt.PYSIDE6:
+    from PySide6.QtCore import QSettings, QTimer, Qt, Signal, QByteArray, QRect, QPoint
+    from PySide6.QtGui import QCloseEvent, QColor, QValidator, QPalette, QPaintEvent
+    from PySide6.QtWidgets import QApplication, QFileDialog, QFormLayout, QGroupBox, QHBoxLayout, QLabel, QLineEdit, \
+        QMainWindow, QPushButton, QSizePolicy, QSpinBox, QStyle, QTabWidget, QVBoxLayout, QWidget
+elif pg.Qt.QT_LIB == pg.Qt.PYQT5:
+    from PyQt5.QtCore import QSettings, QTimer, Qt, pyqtSignal as Signal, QByteArray, QRect, QPoint
+    from PyQt5.QtGui import QCloseEvent, QColor, QValidator, QPalette, QPaintEvent
+    from PyQt5.QtWidgets import QApplication, QFileDialog, QFormLayout, QGroupBox, QHBoxLayout, QLabel, QLineEdit, \
+        QMainWindow, QPushButton, QSizePolicy, QSpinBox, QStyle, QTabWidget, QVBoxLayout, QWidget
+elif pg.Qt.QT_LIB == pg.Qt.PYSIDE2:
+    from PySide2.QtCore import QSettings, QTimer, Qt, Signal, QByteArray, QRect, QPoint
+    from PySide2.QtGui import QCloseEvent, QColor, QValidator, QPalette, QPaintEvent
+    from PySide2.QtWidgets import QApplication, QFileDialog, QFormLayout, QGroupBox, QHBoxLayout, QLabel, QLineEdit, \
+        QMainWindow, QPushButton, QSizePolicy, QSpinBox, QStyle, QTabWidget, QVBoxLayout, QWidget
+    QApplication.exec = QApplication.exec_
+else:
+    raise Exception('PySide6, PyQt5, or PySide2, is required. PyQt6 is not supported.')
 
 from channel_settings import ChannelSettings
 from e502 import E502, X502_ADC_FREQ_DIV_MAX
@@ -61,18 +75,20 @@ class Measurement(Process):
 
 
 class IPAddressValidator(QValidator):
-    def validate(self, text: str, text_length: int) -> QValidator.State:
+    def validate(self, text: str, text_length: int) -> Tuple[QValidator.State, str, int]:
         if not text:
-            return QValidator.State.Invalid
+            return QValidator.State.Invalid, text, 0
         import ipaddress
         try:
             ipaddress.ip_address(text)
         except ValueError:
-            if set(text).issubset(set('0123456789A''BC''DEF''a''bc''def''.:')) and not ('.' in text and ':' in text):
-                return QValidator.State.Intermediate
-            return QValidator.State.Invalid
+            if '.' in text and text.count('.') <= 3 and set(text).issubset(set('0123456789.')):
+                return QValidator.State.Intermediate, text, 0
+            if ':' in text and set(text.casefold()).issubset(set('0123456789a''bc''def:')):
+                return QValidator.State.Intermediate, text, 0
+            return QValidator.State.Invalid, text, 0
         else:
-            return QValidator.State.Acceptable
+            return QValidator.State.Acceptable, text, 0
 
 
 class FilePathEntry(QWidget):
@@ -217,7 +233,7 @@ class ChannelSettingsGUI(QGroupBox, ChannelSettings):
                                                             self)
 
         self.setLayout(QFormLayout())
-        layout: QFormLayout = self.layout()
+        layout: QFormLayout = cast(QFormLayout, self.layout())
         layout.addRow('Range:', self.combo_range)
         layout.addRow('Channel:', self.spin_channel)
         layout.addRow('Mode:', self.combo_mode)
@@ -465,6 +481,10 @@ class GUI(QMainWindow):
             self.tabs[index].colorChanged.connect(self.on_tab_color_changed)
 
     def load_settings(self) -> None:
+        window_frame: QRect = self.frameGeometry()
+        desktop_center: QPoint = self.screen().availableGeometry().center()
+        window_frame.moveCenter(desktop_center)
+        self.move(window_frame.topLeft())
         self.restoreGeometry(cast(QByteArray, self.settings.value('windowGeometry', QByteArray())))
         self.restoreState(cast(QByteArray, self.settings.value('windowState', QByteArray())))
 
