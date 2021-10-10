@@ -10,24 +10,29 @@ from typing import Dict, Iterable, List, Optional, Set, TextIO, Tuple, Union, ca
 import numpy as np
 import pathvalidate
 import pyqtgraph as pg  # type: ignore
+
 if pg.Qt.QT_LIB == pg.Qt.PYSIDE6:
-    from PySide6.QtCore import QSettings, QTimer, Qt, Signal, QByteArray, QRect, QPoint
-    from PySide6.QtGui import QCloseEvent, QColor, QValidator, QPalette, QPaintEvent
-    from PySide6.QtWidgets import QApplication, QFileDialog, QFormLayout, QGroupBox, QHBoxLayout, QLabel, QLineEdit, \
-        QMainWindow, QPushButton, QSizePolicy, QSpinBox, QStyle, QTabWidget, QVBoxLayout, QWidget
+    from PySide6.QtCore import QSettings, QTimer, Qt, Signal, QByteArray, QRect, QPoint  # type: ignore
+    from PySide6.QtGui import QCloseEvent, QColor, QValidator, QPalette, QPaintEvent  # type: ignore
+    from PySide6.QtWidgets import (  # type: ignore
+        QApplication, QFileDialog, QFormLayout, QGroupBox, QHBoxLayout, QLabel, QLineEdit,  # type: ignore
+        QMainWindow, QPushButton, QSizePolicy, QSpinBox, QStyle, QTabWidget, QVBoxLayout, QWidget)  # type: ignore
 elif pg.Qt.QT_LIB == pg.Qt.PYQT5:
-    from PyQt5.QtCore import QSettings, QTimer, Qt, pyqtSignal as Signal, QByteArray, QRect, QPoint
-    from PyQt5.QtGui import QCloseEvent, QColor, QValidator, QPalette, QPaintEvent
-    from PyQt5.QtWidgets import QApplication, QFileDialog, QFormLayout, QGroupBox, QHBoxLayout, QLabel, QLineEdit, \
-        QMainWindow, QPushButton, QSizePolicy, QSpinBox, QStyle, QTabWidget, QVBoxLayout, QWidget
+    from PyQt5.QtCore import QSettings, QTimer, Qt, pyqtSignal as Signal, QByteArray, QRect, QPoint  # type: ignore
+    from PyQt5.QtGui import QCloseEvent, QColor, QValidator, QPalette, QPaintEvent  # type: ignore
+    from PyQt5.QtWidgets import (  # type: ignore
+        QApplication, QFileDialog, QFormLayout, QGroupBox, QHBoxLayout, QLabel, QLineEdit,  # type: ignore
+        QMainWindow, QPushButton, QSizePolicy, QSpinBox, QStyle, QTabWidget, QVBoxLayout, QWidget)  # type: ignore
 elif pg.Qt.QT_LIB == pg.Qt.PYSIDE2:
-    from PySide2.QtCore import QSettings, QTimer, Qt, Signal, QByteArray, QRect, QPoint
-    from PySide2.QtGui import QCloseEvent, QColor, QValidator, QPalette, QPaintEvent
-    from PySide2.QtWidgets import QApplication, QFileDialog, QFormLayout, QGroupBox, QHBoxLayout, QLabel, QLineEdit, \
-        QMainWindow, QPushButton, QSizePolicy, QSpinBox, QStyle, QTabWidget, QVBoxLayout, QWidget
+    from PySide2.QtCore import QSettings, QTimer, Qt, Signal, QByteArray, QRect, QPoint  # type: ignore
+    from PySide2.QtGui import QCloseEvent, QColor, QValidator, QPalette, QPaintEvent  # type: ignore
+    from PySide2.QtWidgets import (  # type: ignore
+        QApplication, QFileDialog, QFormLayout, QGroupBox, QHBoxLayout, QLabel, QLineEdit,  # type: ignore
+        QMainWindow, QPushButton, QSizePolicy, QSpinBox, QStyle, QTabWidget, QVBoxLayout, QWidget)  # type: ignore
+
     QApplication.exec = QApplication.exec_
 else:
-    raise Exception('PySide6, PyQt5, or PySide2, is required. PyQt6 is not supported.')
+    raise ImportError('PySide6, or PyQt5, or PySide2, is required. PyQt6 is not supported.')
 
 from channel_settings import ChannelSettings
 from e502 import E502, X502_ADC_FREQ_DIV_MAX
