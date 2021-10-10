@@ -13,28 +13,14 @@ from file_writer import FileWriter, FileWritingMode
 from gui.channel_settings import ChannelSettings
 from gui.gui import GUI
 from gui.measurement import Measurement
-
-if pg.Qt.QT_LIB == pg.Qt.PYSIDE6:
-    from PySide6.QtCore import QTimer, Qt  # type: ignore
-    from PySide6.QtWidgets import QApplication  # type: ignore
-elif pg.Qt.QT_LIB == pg.Qt.PYQT5:
-    from PyQt5.QtCore import QTimer, Qt  # type: ignore
-    from PyQt5.QtWidgets import QApplication  # type: ignore
-elif pg.Qt.QT_LIB == pg.Qt.PYSIDE2:
-    from PySide2.QtCore import QTimer, Qt  # type: ignore
-    from PySide2.QtWidgets import QApplication  # type: ignore
-
-    QApplication.exec = QApplication.exec_
-else:
-    raise ImportError('PySide6, or PyQt5, or PySide2, is required. PyQt6 is not supported.')
-
+from gui.pg_qt import *
 
 __all__ = ['QApplication', 'App']
 
 
 class App(GUI):
-    def __init__(self, flags: Qt.WindowFlags = Qt.WindowFlags()) -> None:
-        super(App, self).__init__(flags=flags)
+    def __init__(self,) -> None:
+        super(App, self).__init__()
 
         self.timer: QTimer = QTimer(self)
         self.timer.timeout.connect(self.on_timeout)

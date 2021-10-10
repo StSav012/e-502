@@ -6,19 +6,10 @@ from pathlib import Path
 from typing import Optional
 
 import pathvalidate
-import pyqtgraph as pg  # type: ignore
 
-if pg.Qt.QT_LIB == pg.Qt.PYSIDE6:
-    from PySide6.QtWidgets import (  # type: ignore
-        QFileDialog, QHBoxLayout, QLabel, QLineEdit, QPushButton, QStyle, QWidget)  # type: ignore
-elif pg.Qt.QT_LIB == pg.Qt.PYQT5:
-    from PyQt5.QtWidgets import (  # type: ignore
-        QFileDialog, QHBoxLayout, QLabel, QLineEdit, QPushButton, QStyle, QWidget)  # type: ignore
-elif pg.Qt.QT_LIB == pg.Qt.PYSIDE2:
-    from PySide2.QtWidgets import (  # type: ignore
-        QFileDialog, QHBoxLayout, QLabel, QLineEdit, QPushButton, QStyle, QWidget)  # type: ignore
-else:
-    raise ImportError('PySide6, or PyQt5, or PySide2, is required. PyQt6 is not supported.')
+from gui.pg_qt import *
+
+__all__ = ['FilePathEntry']
 
 
 class FilePathEntry(QWidget):

@@ -4,22 +4,9 @@ from __future__ import annotations
 
 from typing import Optional, Union
 
-import pyqtgraph as pg  # type: ignore
+from gui.pg_qt import *
 
-if pg.Qt.QT_LIB == pg.Qt.PYSIDE6:
-    from PySide6.QtCore import Qt  # type: ignore
-    from PySide6.QtGui import QColor, QPalette, QPaintEvent  # type: ignore
-    from PySide6.QtWidgets import QPushButton, QWidget  # type: ignore
-elif pg.Qt.QT_LIB == pg.Qt.PYQT5:
-    from PyQt5.QtCore import Qt  # type: ignore
-    from PyQt5.QtGui import QColor, QPalette, QPaintEvent  # type: ignore
-    from PyQt5.QtWidgets import QPushButton, QWidget  # type: ignore
-elif pg.Qt.QT_LIB == pg.Qt.PYSIDE2:
-    from PySide2.QtCore import Qt  # type: ignore
-    from PySide2.QtGui import QColor, QPalette, QPaintEvent  # type: ignore
-    from PySide2.QtWidgets import QPushButton, QWidget  # type: ignore
-else:
-    raise ImportError('PySide6, or PyQt5, or PySide2, is required. PyQt6 is not supported.')
+__all__ = ['ToggleButton']
 
 
 class ToggleButton(QPushButton):

@@ -10,34 +10,16 @@ import pyqtgraph as pg  # type: ignore
 from gui.channel_settings import ChannelSettings
 from gui.digital_lines import DigitalLines
 from gui.ip_address_validator import IPAddressValidator
-
-if pg.Qt.QT_LIB == pg.Qt.PYSIDE6:
-    from PySide6.QtCore import QSettings, Qt, QByteArray, QRect, QPoint
-    from PySide6.QtGui import QCloseEvent, QColor
-    from PySide6.QtWidgets import (  # type: ignore
-        QFormLayout, QHBoxLayout, QLineEdit, QMainWindow, QPushButton, QSpinBox, QTabWidget,  # type: ignore
-        QVBoxLayout, QWidget)  # type: ignore
-elif pg.Qt.QT_LIB == pg.Qt.PYQT5:
-    from PyQt5.QtCore import QSettings, Qt, QByteArray, QRect, QPoint  # type: ignore
-    from PyQt5.QtGui import QCloseEvent, QColor  # type: ignore
-    from PyQt5.QtWidgets import (  # type: ignore
-        QFormLayout, QHBoxLayout, QLineEdit, QMainWindow, QPushButton, QSpinBox, QTabWidget,  # type: ignore
-        QVBoxLayout, QWidget)  # type: ignore
-elif pg.Qt.QT_LIB == pg.Qt.PYSIDE2:
-    from PySide2.QtCore import QSettings, Qt, QByteArray, QRect, QPoint  # type: ignore
-    from PySide2.QtGui import QCloseEvent, QColor  # type: ignore
-    from PySide2.QtWidgets import (  # type: ignore
-        QFormLayout, QHBoxLayout, QLineEdit, QMainWindow, QPushButton, QSpinBox, QTabWidget,  # type: ignore
-        QVBoxLayout, QWidget)  # type: ignore
-else:
-    raise ImportError('PySide6, or PyQt5, or PySide2, is required. PyQt6 is not supported.')
+from gui.pg_qt import *
 
 from e502 import X502_ADC_FREQ_DIV_MAX
 
+__all__ = ['GUI']
+
 
 class GUI(QMainWindow):
-    def __init__(self, flags: Qt.WindowFlags = Qt.WindowFlags()) -> None:
-        super(GUI, self).__init__(flags=flags)
+    def __init__(self) -> None:
+        super(GUI, self).__init__()
 
         self.settings: QSettings = QSettings('SavSoft', 'E-502', self)
 
@@ -103,7 +85,7 @@ class GUI(QMainWindow):
 
         self.text_ip_address.setValidator(IPAddressValidator())
 
-        self.plot.setFocusPolicy(Qt.ClickFocus)
+        self.plot.setFocusPolicy(Qt.FocusPolicy.ClickFocus)
 
         self.main_layout.addWidget(self.plot)
         self.main_layout.addLayout(self.controls_layout)

@@ -4,16 +4,9 @@ from __future__ import annotations
 
 from typing import Tuple
 
-import pyqtgraph as pg  # type: ignore
+from gui.pg_qt import QValidator
 
-if pg.Qt.QT_LIB == pg.Qt.PYSIDE6:
-    from PySide6.QtGui import QValidator  # type: ignore
-elif pg.Qt.QT_LIB == pg.Qt.PYQT5:
-    from PyQt5.QtGui import QValidator  # type: ignore
-elif pg.Qt.QT_LIB == pg.Qt.PYSIDE2:
-    from PySide2.QtGui import QValidator  # type: ignore
-else:
-    raise ImportError('PySide6, or PyQt5, or PySide2, is required. PyQt6 is not supported.')
+__all__ = ['IPAddressValidator']
 
 
 class IPAddressValidator(QValidator):

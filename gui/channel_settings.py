@@ -4,28 +4,14 @@ from __future__ import annotations
 
 from typing import cast
 
-import pyqtgraph as pg  # type: ignore
-
-from gui.file_path_entry import FilePathEntry
-
-if pg.Qt.QT_LIB == pg.Qt.PYSIDE6:
-    from PySide6.QtCore import QSettings, Qt, Signal  # type: ignore
-    from PySide6.QtGui import QColor  # type: ignore
-    from PySide6.QtWidgets import QFormLayout, QGroupBox, QSizePolicy, QSpinBox  # type: ignore
-elif pg.Qt.QT_LIB == pg.Qt.PYQT5:
-    from PyQt5.QtCore import QSettings, Qt, pyqtSignal as Signal  # type: ignore
-    from PyQt5.QtGui import QColor  # type: ignore
-    from PyQt5.QtWidgets import QFormLayout, QGroupBox, QSizePolicy, QSpinBox  # type: ignore
-elif pg.Qt.QT_LIB == pg.Qt.PYSIDE2:
-    from PySide2.QtCore import QSettings, Qt, Signal  # type: ignore
-    from PySide2.QtGui import QColor  # type: ignore
-    from PySide2.QtWidgets import QFormLayout, QGroupBox, QSizePolicy, QSpinBox  # type: ignore
-else:
-    raise ImportError('PySide6, or PyQt5, or PySide2, is required. PyQt6 is not supported.')
+from pyqtgraph import ComboBox, ColorButton
 
 from channel_settings import ChannelSettings as _ChannelSettings
-
+from gui.file_path_entry import FilePathEntry
+from gui.pg_qt import *
 from stubs import Final
+
+__all__ = ['ChannelSettings']
 
 
 class ChannelSettings(QGroupBox, _ChannelSettings):
@@ -51,8 +37,8 @@ class ChannelSettings(QGroupBox, _ChannelSettings):
             self.setChecked(False)
         self.toggled.connect(self.on_toggled)
 
-        self.combo_range: pg.ComboBox = pg.ComboBox(self, items={'±10 V': 0, '±5 V': 1, '±2 V': 2,
-                                                                 '±1 V': 3, '±0.5 V': 4, '±0.2 V': 5})
+        self.combo_range: ComboBox = ComboBox(self, items={'±10 V': 0, '±5 V': 1, '±2 V': 2,
+                                                           '±1 V': 3, '±0.5 V': 4, '±0.2 V': 5})
         try:
             if self._count < settings_length:
                 self.combo_range.setValue(self.settings.value('range', 0, int))
@@ -61,10 +47,10 @@ class ChannelSettings(QGroupBox, _ChannelSettings):
         self.combo_range.currentIndexChanged.connect(self.on_combo_range_changed)
         self.range = self.combo_range.value()
 
-        self.combo_mode: pg.ComboBox = pg.ComboBox(self, items={'Differential': 0,
-                                                                'Channels 1 to 16 with common GND': 1,
-                                                                'Channels 16 to 32 with common GND': 2,
-                                                                'Grounded ADC': 3})
+        self.combo_mode: ComboBox = ComboBox(self, items={'Differential': 0,
+                                                          'Channels 1 to 16 with common GND': 1,
+                                                          'Channels 16 to 32 with common GND': 2,
+                                                          'Grounded ADC': 3})
         try:
             if self._count < settings_length:
                 self.combo_mode.setValue(self.settings.value('mode', 0, int))
@@ -96,7 +82,7 @@ class ChannelSettings(QGroupBox, _ChannelSettings):
         self.spin_averaging.valueChanged.connect(self.on_spin_averaging_changed)
         self.averaging = self.spin_averaging.value()
 
-        self.color_button: pg.ColorButton = pg.ColorButton(self)
+        self.color_button: ColorButton = ColorButton(self)
         try:
             if self._count < settings_length:
                 self.color_button.setColor(self.settings.value('lineColor', QColor(Qt.GlobalColor.lightGray), QColor))
@@ -117,8 +103,10 @@ class ChannelSettings(QGroupBox, _ChannelSettings):
         layout.addRow('Data File:', self.saving_location)
         r: int
         for r in range(layout.rowCount()):
-            layout.itemAt(r, QFormLayout.LabelRole).widget().setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-            layout.itemAt(r, QFormLayout.LabelRole).widget().setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+            layout.itemAt(r, QFormLayout.ItemRole.LabelRole).widget().setSizePolicy(QSizePolicy.Policy.Expanding,
+                                                                                    QSizePolicy.Policy.Expanding)
+            layout.itemAt(r, QFormLayout.ItemRole.LabelRole).widget().setAlignment(Qt.AlignmentFlag.AlignLeft
+                                                                                   | Qt.AlignmentFlag.AlignVCenter)
 
         self.settings.endArray()
 
@@ -165,7 +153,7 @@ class ChannelSettings(QGroupBox, _ChannelSettings):
         self.settings.setValue('averaging', self.averaging)
         self.settings.endArray()
 
-    def on_color_changed(self, sender: pg.ColorButton) -> None:
+    def on_color_changed(self, sender: ColorButton) -> None:
         self.settings.beginWriteArray('channelSettings', self._count)
         self.settings.setArrayIndex(self._index)
         self.settings.setValue('lineColor', sender.color())

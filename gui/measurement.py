@@ -11,6 +11,8 @@ from channel_settings import ChannelSettings
 from e502 import E502
 from gui.digital_lines import DigitalLines
 
+__all__ = ['Measurement']
+
 
 class Measurement(Process):
     def __init__(self, results_queue: Queue[np.ndarray],
