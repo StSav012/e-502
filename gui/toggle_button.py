@@ -9,13 +9,12 @@ from gui.pg_qt import *
 __all__ = ['ToggleButton']
 
 
-class ToggleButton(QPushButton):
+class ToggleButton(QToolButton):
     def __init__(self, color: Union[Qt.GlobalColor, QColor],
                  title: str = '', parent: Optional[QWidget] = None) -> None:
+        super().__init__(parent)
         if title:
-            super().__init__(title, parent)
-        else:
-            super().__init__(parent)
+            self.setText(title)
 
         self._color: QColor = QColor(color)
         self._orig_palette: QPalette = self.palette()
