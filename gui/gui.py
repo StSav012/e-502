@@ -9,7 +9,7 @@ import pyqtgraph as pg  # type: ignore
 
 from gui.channel_settings import ChannelSettings
 from gui.digital_lines import DigitalLines
-from gui.ip_address_validator import IPAddressValidator
+from gui.ip_address_entry import IPAddressEntry
 from gui.pg_qt import *
 
 from e502 import X502_ADC_FREQ_DIV_MAX
@@ -30,7 +30,7 @@ class GUI(QMainWindow):
         self.parameters_layout: QFormLayout = QFormLayout(self.parameters_box)
         self.buttons_layout: QHBoxLayout = QHBoxLayout()
 
-        self.text_ip_address: QLineEdit = QLineEdit(self.parameters_box)
+        self.text_ip_address: IPAddressEntry = IPAddressEntry(self.parameters_box)
         self.spin_sample_rate: pg.SpinBox = pg.SpinBox(self.parameters_box)
         self.spin_duration: pg.SpinBox = pg.SpinBox(self.parameters_box)
         self.spin_portion_size: QSpinBox = QSpinBox(self.parameters_box)
@@ -82,8 +82,6 @@ class GUI(QMainWindow):
 
         self.spin_portion_size.setRange(1, 1_000_000)
         self.spin_frequency_divider.setRange(1, X502_ADC_FREQ_DIV_MAX)
-
-        self.text_ip_address.setValidator(IPAddressValidator())
 
         self.plot.setFocusPolicy(Qt.FocusPolicy.ClickFocus)
 
@@ -139,7 +137,7 @@ class GUI(QMainWindow):
         self.restoreState(cast(QByteArray, self.settings.value('windowState', QByteArray())))
 
         self.settings.beginGroup('parameters')
-        self.text_ip_address.setText(cast(str, self.settings.value('ipAddress', '192.168.0.1', str)))
+        self.text_ip_address.text = cast(str, self.settings.value('ipAddress', '192.168.0.1', str))
         self.spin_sample_rate.setValue(cast(float, self.settings.value('sampleRate', 2e6, float)))
         self.spin_duration.setValue(cast(float, self.settings.value('measurementDuration', 60.0, float)))
         self.spin_portion_size.setValue(cast(int, self.settings.value('samplesPortionSize', 1000, int)))
@@ -166,7 +164,7 @@ class GUI(QMainWindow):
         self.settings.setValue('windowState', self.saveState())
 
         self.settings.beginGroup('parameters')
-        self.settings.setValue('ipAddress', self.text_ip_address.text())
+        self.settings.setValue('ipAddress', self.text_ip_address.text)
         self.settings.setValue('sampleRate', self.spin_sample_rate.value())
         self.settings.setValue('measurementDuration', self.spin_duration.value())
         self.settings.setValue('samplesPortionSize', self.spin_portion_size.value())
