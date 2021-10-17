@@ -56,7 +56,7 @@ class E502:
     def get_response(self) -> Tuple[bytes, int]:
         ctl1: bytes = self._control_socket.recv(4)
         if self._verbose:
-            print(f"CTL1          = {ctl1}")
+            print(f"CTL1          = {ctl1!r}")
         error: int = int.from_bytes(self._control_socket.recv(4), 'little', signed=True)
         if self._verbose:
             print(f"error         = {error:x}")
@@ -65,7 +65,7 @@ class E502:
             print(f"response size = {response_size}")
         response: bytes = self._control_socket.recv(response_size)
         if self._verbose:
-            print(f"response      = {response}")
+            print(f"response      = {response!r}")
         return response, error
 
     # 0x0200–0x03FF     IO_HARD             Управление вводом-выводом
@@ -263,7 +263,7 @@ class E502:
         return channels_settings, 0
 
     def write_channels_settings_table(self, channels_settings: Sequence[ChannelSettings]) -> None:
-        self._settings = channels_settings[:]
+        self._settings = list(channels_settings)
         self.write_register(0x300, len(channels_settings) - 1)
         channel: int
         channel_settings: ChannelSettings
