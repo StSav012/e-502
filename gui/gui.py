@@ -58,7 +58,7 @@ class GUI(QMainWindow):
     def setup_ui_appearance(self) -> None:
         opts: Dict[str, Union[bool, str, int, float, Tuple[float, float]]]
         opts = {
-            'suffix': 'S/s',
+            'suffix': self.tr('S/s', 'unit: samples per second'),
             'siPrefix': True,
             'decimals': 3,
             'dec': True,
@@ -69,7 +69,7 @@ class GUI(QMainWindow):
         }
         self.spin_sample_rate.setOpts(**opts)
         opts = {
-            'suffix': 's',
+            'suffix': self.tr('s', 'unit: seconds'),
             'siPrefix': False,
             'decimals': 1,
             'dec': True,
@@ -93,13 +93,13 @@ class GUI(QMainWindow):
         self.controls_layout.addWidget(self.tabs_container)
         self.controls_layout.addLayout(self.buttons_layout)
 
-        self.digital_lines.setTitle('Digital Lines')
+        self.digital_lines.setTitle(self.tr('Digital Lines'))
 
-        self.parameters_layout.addRow('IP Address:', self.text_ip_address)
-        self.parameters_layout.addRow('Sample Rate:', self.spin_sample_rate)
-        self.parameters_layout.addRow('Measurement Duration:', self.spin_duration)
-        self.parameters_layout.addRow('Portion Size:', self.spin_portion_size)
-        self.parameters_layout.addRow('Sync Input Frequency Divider:', self.spin_frequency_divider)
+        self.parameters_layout.addRow(self.tr('IP address:'), self.text_ip_address)
+        self.parameters_layout.addRow(self.tr('Sample rate:'), self.spin_sample_rate)
+        self.parameters_layout.addRow(self.tr('Measurement duration:'), self.spin_duration)
+        self.parameters_layout.addRow(self.tr('Portion size:'), self.spin_portion_size)
+        self.parameters_layout.addRow(self.tr('Sync input frequency divider:'), self.spin_frequency_divider)
 
         i: int
         t: ChannelSettings
@@ -109,8 +109,8 @@ class GUI(QMainWindow):
         self.buttons_layout.addWidget(self.button_start)
         self.buttons_layout.addWidget(self.button_stop)
 
-        self.button_start.setText('Start')
-        self.button_stop.setText('Stop')
+        self.button_start.setText(self.tr('Start'))
+        self.button_stop.setText(self.tr('Stop'))
         self.button_stop.setDisabled(True)
 
         self.setCentralWidget(self.central_widget)

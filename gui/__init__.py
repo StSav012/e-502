@@ -2,94 +2,56 @@
 
 from __future__ import annotations
 
-from multiprocessing import Queue
-from pathlib import Path
-from typing import List, Optional, Tuple, cast
+import os
+import sys
+from typing import Set
 
-import numpy as np
-import pyqtgraph as pg
-
-from file_writer import FileWriter, FileWritingMode
-from gui.channel_settings import ChannelSettings
-from gui.gui import GUI
-from gui.measurement import Measurement
+from gui.app import App
 from gui.pg_qt import *
 
-__all__ = ['QApplication', 'App']
 
+def execute() -> int:
+    # https://www.reddit.com/r/learnpython/comments/4kjie3/how_to_include_gui_images_with_pyinstaller/d3gjmom
+    def resource_path(relative_path: str) -> str:
+        if hasattr(sys, '_MEIPASS'):
+            return os.path.join(getattr(sys, '_MEIPASS'), relative_path)
+        return os.path.join(os.path.abspath('.'), relative_path)
 
-class App(GUI):
-    def __init__(self,) -> None:
-        super(App, self).__init__()
+    application: QApplication = QApplication(sys.argv)
 
-        self.timer: QTimer = QTimer(self)
-        self.timer.timeout.connect(self.on_timeout)
+    languages: Set[str] = set(QLocale().uiLanguages() + [QLocale().bcp47Name(), QLocale().name()])
+    language: str
+    qt_translator: QTranslator = QTranslator()
+    for language in languages:
+        if qt_translator.load('qt_' + language,
+                              QLibraryInfo.path(QLibraryInfo.LibraryPath.TranslationsPath)):
+            application.installTranslator(qt_translator)
+            break
+    qtbase_translator: QTranslator = QTranslator()
+    for language in languages:
+        if qtbase_translator.load('qtbase_' + language,
+                                  QLibraryInfo.path(QLibraryInfo.LibraryPath.TranslationsPath)):
+            application.installTranslator(qtbase_translator)
+            break
+    my_translator: QTranslator = QTranslator()
+    if my_translator.load(QLocale.system().name(), resource_path('translations')):
+        application.installTranslator(my_translator)
 
-        self.requests_queue: Queue[Tuple[Optional[Path], FileWritingMode, np.ndarray]] = Queue()
-        self.results_queue: Queue[np.ndarray] = Queue()
-        self.measurement: Optional[Measurement] = None
-        self.file_writer: Optional[FileWriter] = None
+    import re
+    from pyqtgraph import functions as fn
 
-        self._data: List[np.ndarray] = []
+    fn.SI_PREFIXES = QApplication.translate('si prefixes', 'y,z,a,f,p,n,µ,m, ,k,M,G,T,P,E,Z,Y').split(',')
+    fn.SI_PREFIXES_ASCII = fn.SI_PREFIXES
+    fn.SI_PREFIX_EXPONENTS.update(dict([(s, (i - 8) * 3) for i, s in enumerate(fn.SI_PREFIXES)]))
+    if QApplication.translate('si prefix alternative micro', 'u'):
+        fn.SI_PREFIX_EXPONENTS[QApplication.translate('si prefix alternative micro', 'u')] = -6
+    fn.FLOAT_REGEX = re.compile(
+        r'(?P<number>[+-]?((((\d+(\.\d*)?)|(\d*\.\d+))([eE][+-]?\d+)?)'
+        r'|(nan|NaN|NAN|inf|Inf|INF)))\s*'
+        r'((?P<siPrefix>[u(' + '|'.join(fn.SI_PREFIXES) + r')]?)(?P<suffix>\w.*))?$')
+    fn.INT_REGEX = re.compile(r'(?P<number>[+-]?\d+)\s*'
+                              r'(?P<siPrefix>[u(' + '|'.join(fn.SI_PREFIXES) + r')]?)(?P<suffix>.*)$')
 
-        self._index_map: List[int] = []
-
-    def on_button_start_clicked(self) -> None:
-        super(App, self).on_button_start_clicked()
-        t: ChannelSettings
-        i: int
-        self._index_map = []
-        for i, t in enumerate(self.tabs):
-            if t.isChecked():
-                self._index_map.append(i)
-        active_settings: List[ChannelSettings] = [t for t in self.tabs if t.isChecked()]
-        c: pg.PlotItem
-        for i, c in enumerate(self.canvases):
-            c.clearPlots()
-            c.setVisible(i < len(active_settings))
-        self.plot_lines = [c.plot(np.empty(0),
-                                  name=f'{t.physical_channel}',
-                                  pen=t.color_button.color())
-                           for c, t in zip(self.canvases, active_settings)]
-        self._data = [np.empty(0) for _ in active_settings]
-        self.timer.start(10)
-        self.measurement = Measurement(self.results_queue,
-                                       ip_address=self.text_ip_address.text,
-                                       settings=active_settings,
-                                       adc_frequency_divider=self.spin_frequency_divider.value(),
-                                       data_portion_size=self.spin_portion_size.value(),
-                                       digital_lines=self.digital_lines)
-        self.measurement.start()
-        self.file_writer = FileWriter(self.requests_queue)
-        self.file_writer.start()
-
-    def on_button_stop_clicked(self) -> None:
-        if self.measurement is not None:
-            self.measurement.terminate()
-            self.measurement.join()
-        if self.file_writer is not None:
-            self.file_writer.terminate()
-            self.file_writer.join()
-        self.timer.stop()
-        super(App, self).on_button_stop_clicked()
-
-    def on_timeout(self) -> None:
-        ch: int
-        d: np.ndarray
-        line: pg.PlotDataItem
-        needs_updating: bool = not self.results_queue.empty()
-        while not self.results_queue.empty():
-            data: np.ndarray = self.results_queue.get()
-            for ch, line in zip(range(data.shape[1]), self.plot_lines):
-                channel_data: np.ndarray = data[..., ch]
-                if not channel_data.size:
-                    continue
-                self._data[ch] = np.concatenate((self._data[ch], channel_data))
-                tab_index: int = self._index_map[ch]
-                if self.tabs[tab_index].saving_location.path is not None:
-                    self.requests_queue.put((self.tabs[tab_index].saving_location.path,
-                                             cast(FileWritingMode, 'at'),
-                                             channel_data))
-        if needs_updating:
-            for d, line in zip(self._data, self.plot_lines):
-                line.setData(d)
+    window: App = App()
+    window.show()
+    return application.exec()

@@ -21,8 +21,10 @@ class ChannelSettings(QGroupBox, _ChannelSettings):
     _count: int = 0
 
     def __init__(self, settings: QSettings) -> None:
-        QGroupBox.__init__(self, 'Enabled')
+        QGroupBox.__init__(self)
         _ChannelSettings.__init__(self)
+
+        self.setTitle(self.tr('Enabled'))  # cannot use `tr` in `__init__` parameters with PySide2
 
         self.settings: QSettings = settings
         settings_length: Final[int] = self.settings.beginReadArray('channelSettings')
@@ -37,8 +39,9 @@ class ChannelSettings(QGroupBox, _ChannelSettings):
             self.setChecked(False)
         self.toggled.connect(self.on_toggled)
 
-        self.combo_range: ComboBox = ComboBox(self, items={'±10 V': 0, '±5 V': 1, '±2 V': 2,
-                                                           '±1 V': 3, '±0.5 V': 4, '±0.2 V': 5})
+        self.combo_range: ComboBox = ComboBox(self,
+                                              items={self.tr('±10 V'): 0, self.tr('±5 V'): 1, self.tr('±2 V'): 2,
+                                                     self.tr('±1 V'): 3, self.tr('±0.5 V'): 4, self.tr('±0.2 V'): 5})
         try:
             if self._count < settings_length:
                 self.combo_range.setValue(self.settings.value('range', 0, int))
@@ -47,10 +50,10 @@ class ChannelSettings(QGroupBox, _ChannelSettings):
         self.combo_range.currentIndexChanged.connect(self.on_combo_range_changed)
         self.range = self.combo_range.value()
 
-        self.combo_mode: ComboBox = ComboBox(self, items={'Differential': 0,
-                                                          'Channels 1 to 16 with common GND': 1,
-                                                          'Channels 16 to 32 with common GND': 2,
-                                                          'Grounded ADC': 3})
+        self.combo_mode: ComboBox = ComboBox(self, items={self.tr('Differential'): 0,
+                                                          self.tr('Channels 1 to 16 with common GND'): 1,
+                                                          self.tr('Channels 16 to 32 with common GND'): 2,
+                                                          self.tr('Grounded ADC'): 3})
         try:
             if self._count < settings_length:
                 self.combo_mode.setValue(self.settings.value('mode', 0, int))
@@ -95,12 +98,12 @@ class ChannelSettings(QGroupBox, _ChannelSettings):
 
         self.setLayout(QFormLayout())
         layout: QFormLayout = cast(QFormLayout, self.layout())
-        layout.addRow('Range:', self.combo_range)
-        layout.addRow('Channel:', self.spin_channel)
-        layout.addRow('Mode:', self.combo_mode)
-        layout.addRow('Averaging:', self.spin_averaging)
-        layout.addRow('Line Color:', self.color_button)
-        layout.addRow('Data File:', self.saving_location)
+        layout.addRow(self.tr('Range:'), self.combo_range)
+        layout.addRow(self.tr('Channel:'), self.spin_channel)
+        layout.addRow(self.tr('Mode:'), self.combo_mode)
+        layout.addRow(self.tr('Averaging:'), self.spin_averaging)
+        layout.addRow(self.tr('Line color:'), self.color_button)
+        layout.addRow(self.tr('Data file:'), self.saving_location)
         r: int
         for r in range(layout.rowCount()):
             layout.itemAt(r, QFormLayout.ItemRole.LabelRole).widget().setSizePolicy(QSizePolicy.Policy.Expanding,
