@@ -28,7 +28,7 @@ class IPAddressEntry(QWidget):
         self.text_ip_address.setValidator(IPAddressValidator())
         self.browse_button.clicked.connect(self.browse)
 
-        self.results_queue: Queue = Queue()
+        self.results_queue: Queue[str] = Queue()
 
     @property
     def text(self) -> str:

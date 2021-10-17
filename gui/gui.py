@@ -153,7 +153,6 @@ class GUI(QMainWindow):
         tab: ChannelSettings
         checked_tabs_count: int = sum(tab.isChecked() for tab in self.tabs)
         if checked_tabs_count:
-            i: int
             c: pg.PlotItem
             for i, c in enumerate(self.canvases):
                 c.setVisible(i < checked_tabs_count)

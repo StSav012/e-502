@@ -30,7 +30,7 @@ class IPAddressDialog(QDialog):
         layout.addWidget(self.buttons)
         self.timer: QTimer = QTimer(self)
 
-        self.results_queue: Queue = Queue()
+        self.results_queue: Queue[str] = Queue()
         self.scanner: IPv4PortScanner = IPv4PortScanner(self.results_queue)
 
         self.timer.setInterval(100)
