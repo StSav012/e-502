@@ -54,7 +54,7 @@ class App(GUI):
         self._data = [np.empty(0) for _ in active_settings]
         self.timer.start(10)
         self.measurement = Measurement(self.results_queue,
-                                       ip_address=self.text_ip_address.text(),
+                                       ip_address=self.text_ip_address.text,
                                        settings=active_settings,
                                        adc_frequency_divider=self.spin_frequency_divider.value(),
                                        data_portion_size=self.spin_portion_size.value(),
