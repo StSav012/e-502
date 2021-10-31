@@ -18,14 +18,37 @@ class IPAddressValidator(QValidator):
         while text.startswith('00'):
             text = text[1:]
             cursor_position = max(0, cursor_position - 1)
+        if text.startswith('0') and not text.startswith('0.'):
+            text = text[1:]
+            cursor_position = max(0, cursor_position - 1)
 
         # remove leading zeroes in IPv4
         i: int = text.find('.0')
         while i != -1:
+            if not (i + 2 == len(text) or text[i + 2] == '.'):
+                if i < cursor_position + 2:
+                    cursor_position -= 1
+                text = text[:i + 1] + text[i + 2:]
+            i = text.find('.0', i + 1)
+
+        # insert zeroes between dots in IPv4
+        i: int = text.find('..')
+        while i != -1:
             if i < cursor_position + 2:
-                cursor_position -= 1
-            text = text[:i + 1] + text[i + 2:]
-            i = text.find('.0')
+                cursor_position += 1
+            text = text[:i + 1] + '0' + text[i + 1:]
+            i = text.find('..')
+        if text.startswith('.'):
+            text = '0' + text
+            cursor_position += 1
+
+        if ':' not in text:  # assume IPv4
+            # prepend IPv4 with zeroes
+            while text.count('.') < 3:
+                text = '0.' + text
+                cursor_position += 2
+            if text.count('.') > 3:
+                return QValidator.State.Invalid, text, cursor_position
 
         # remove leading zeroes in IPv6
         i = text.find(':0')
