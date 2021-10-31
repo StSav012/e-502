@@ -25,7 +25,9 @@ class GUI(QMainWindow):
 
         self.central_widget: QWidget = QWidget(self)
         self.main_layout: QHBoxLayout = QHBoxLayout(self.central_widget)
-        self.controls_layout: QVBoxLayout = QVBoxLayout()
+        self.scrollable_box: QScrollArea = QScrollArea(self.central_widget)
+        self.controls_box: QWidget = QWidget(self.central_widget)
+        self.controls_layout: QVBoxLayout = QVBoxLayout(self.controls_box)
         self.parameters_box: QWidget = QWidget(self.central_widget)
         self.parameters_layout: QFormLayout = QFormLayout(self.parameters_box)
         self.buttons_layout: QHBoxLayout = QHBoxLayout()
@@ -86,12 +88,22 @@ class GUI(QMainWindow):
         self.plot.setFocusPolicy(Qt.FocusPolicy.ClickFocus)
 
         self.main_layout.addWidget(self.plot)
-        self.main_layout.addLayout(self.controls_layout)
+        self.main_layout.addWidget(self.scrollable_box)
         self.controls_layout.addWidget(self.parameters_box)
         self.controls_layout.addWidget(self.digital_lines)
         self.controls_layout.addStretch(1)
         self.controls_layout.addWidget(self.tabs_container)
         self.controls_layout.addLayout(self.buttons_layout)
+
+        # https://forum.qt.io/post/129727
+        self.scrollable_box.setWidgetResizable(True)
+        self.scrollable_box.setFrameStyle(QFrame.Shape.NoFrame)
+        self.scrollable_box.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.scrollable_box.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        self.scrollable_box.setWidget(self.controls_box)
+        self.controls_box.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Preferred)
+        self.scrollable_box.setMinimumWidth(self.controls_box.minimumSizeHint().width()
+                                            + self.scrollable_box.verticalScrollBar().width())
 
         self.digital_lines.setTitle(self.tr('Digital Lines'))
 

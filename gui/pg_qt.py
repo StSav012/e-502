@@ -9,14 +9,14 @@ if Qt.QT_LIB == Qt.PYSIDE6:
         QLocale, QLibraryInfo, QTranslator
     from PySide6.QtWidgets import QGroupBox, QHBoxLayout, QPushButton, QWidget, QFormLayout, QGroupBox, QSizePolicy, \
         QSpinBox, QLineEdit, QApplication, QLabel, QStyle, QFileDialog, QMainWindow, QVBoxLayout, QTabWidget, \
-        QCheckBox, QComboBox, QToolButton, QDialog, QListWidget, QDialogButtonBox, QListWidgetItem
+        QCheckBox, QComboBox, QToolButton, QDialog, QListWidget, QDialogButtonBox, QListWidgetItem, QScrollArea, QFrame
     from PySide6.QtGui import QColor, QCloseEvent, QValidator, QPalette, QPaintEvent
 elif Qt.QT_LIB == Qt.PYQT5:
     from PyQt5.QtCore import QTimer, QSettings, Qt, pyqtSignal as Signal, QRect, QByteArray, QPoint, QModelIndex, \
         QLocale, QLibraryInfo, QTranslator
     from PyQt5.QtWidgets import QGroupBox, QHBoxLayout, QPushButton, QWidget, QFormLayout, QGroupBox, QSizePolicy, \
         QSpinBox, QLineEdit, QApplication, QLabel, QStyle, QFileDialog, QMainWindow, QVBoxLayout, QTabWidget, \
-        QCheckBox, QComboBox, QToolButton, QDialog, QListWidget, QDialogButtonBox, QListWidgetItem
+        QCheckBox, QComboBox, QToolButton, QDialog, QListWidget, QDialogButtonBox, QListWidgetItem, QScrollArea, QFrame
     from PyQt5.QtGui import QCloseEvent, QColor, QPaintEvent, QPalette, QValidator
 
     QLibraryInfo.LibraryPath = QLibraryInfo.LibraryLocation
@@ -26,14 +26,14 @@ elif Qt.QT_LIB == Qt.PYQT6:
         QLocale, QLibraryInfo, QTranslator
     from PyQt6.QtWidgets import QGroupBox, QHBoxLayout, QPushButton, QWidget, QFormLayout, QGroupBox, QSizePolicy, \
         QSpinBox, QLineEdit, QApplication, QLabel, QStyle, QFileDialog, QMainWindow, QVBoxLayout, QTabWidget, \
-        QCheckBox, QComboBox, QToolButton, QDialog, QListWidget, QDialogButtonBox, QListWidgetItem
+        QCheckBox, QComboBox, QToolButton, QDialog, QListWidget, QDialogButtonBox, QListWidgetItem, QScrollArea, QFrame
     from PyQt6.QtGui import QCloseEvent, QColor, QPaintEvent, QPalette, QValidator
 elif Qt.QT_LIB == Qt.PYSIDE2:
     from PySide2.QtCore import QTimer, Qt, QSettings, Signal, QRect, QByteArray, QPoint, QModelIndex, \
         QLocale, QLibraryInfo, QTranslator
     from PySide2.QtWidgets import QGroupBox, QHBoxLayout, QPushButton, QWidget, QFormLayout, QGroupBox, QSizePolicy, \
         QSpinBox, QLineEdit, QApplication, QLabel, QStyle, QFileDialog, QMainWindow, QVBoxLayout, QTabWidget, \
-        QCheckBox, QComboBox, QToolButton, QDialog, QListWidget, QDialogButtonBox, QListWidgetItem
+        QCheckBox, QComboBox, QToolButton, QDialog, QListWidget, QDialogButtonBox, QListWidgetItem, QScrollArea, QFrame
     from PySide2.QtGui import QCloseEvent, QColor, QPaintEvent, QPalette, QValidator
 
     QLibraryInfo.LibraryPath = QLibraryInfo.LibraryLocation
@@ -64,7 +64,7 @@ __all__ = [
     'QWidget',
     'QTabWidget',
     'QFormLayout', 'QHBoxLayout', 'QVBoxLayout',
-    'QGroupBox',
+    'QGroupBox', 'QScrollArea', 'QFrame',
     'QLabel', 'QCheckBox', 'QPushButton', 'QToolButton', 'QLineEdit', 'QSpinBox', 'QComboBox',
     'QListWidgetItem', 'QListWidget',
     'QDialogButtonBox', 'QDialog', 'QFileDialog',
