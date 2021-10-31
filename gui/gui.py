@@ -21,7 +21,7 @@ class GUI(QMainWindow):
     def __init__(self) -> None:
         super(GUI, self).__init__()
 
-        self.settings: QSettings = QSettings('SavSoft', 'E-502', self)
+        self.settings: QSettings = QSettings('config.ini', QSettings.Format.IniFormat, self)
 
         self.central_widget: QWidget = QWidget(self)
         self.main_layout: QHBoxLayout = QHBoxLayout(self.central_widget)
