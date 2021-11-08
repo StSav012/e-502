@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Dict, List, Set, Tuple, Union, cast
 
 import numpy as np
@@ -9,6 +10,7 @@ import pyqtgraph as pg  # type: ignore
 
 from gui.channel_settings import ChannelSettings
 from gui.digital_lines import DigitalLines
+from gui.dir_path_entry import DirPathEntry
 from gui.ip_address_entry import IPAddressEntry
 from gui.pg_qt import *
 
@@ -39,16 +41,10 @@ class GUI(QMainWindow):
         self.spin_frequency_divider: QSpinBox = QSpinBox(self.parameters_box)
         self.digital_lines: DigitalLines = DigitalLines(parent=self.parameters_box)
 
+        self.saving_location: DirPathEntry = DirPathEntry('', self)
+
         self.tabs_container: QTabWidget = QTabWidget(self.central_widget)
         self.tabs: List[ChannelSettings] = [ChannelSettings(self.settings) for _ in range(8)]
-        i: int
-        t: ChannelSettings
-        for i, t in enumerate(self.tabs):
-            t.color_button.setColor(pg.intColor(i, hues=len(self.tabs)))
-
-        self.plot: pg.GraphicsLayoutWidget = pg.GraphicsLayoutWidget(self.central_widget)
-        self.canvases: List[pg.PlotItem] = [self.plot.addPlot(row=i, col=0) for i in range(len(self.tabs))]
-        self.plot_lines: List[pg.PlotDataItem] = []
 
         self.button_start: QPushButton = QPushButton(self.central_widget)
         self.button_stop: QPushButton = QPushButton(self.central_widget)
@@ -85,9 +81,6 @@ class GUI(QMainWindow):
         self.spin_portion_size.setRange(1, 1_000_000)
         self.spin_frequency_divider.setRange(1, X502_ADC_FREQ_DIV_MAX)
 
-        self.plot.setFocusPolicy(Qt.FocusPolicy.ClickFocus)
-
-        self.main_layout.addWidget(self.plot)
         self.main_layout.addWidget(self.scrollable_box)
         self.controls_layout.addWidget(self.parameters_box)
         self.controls_layout.addWidget(self.digital_lines)
@@ -112,6 +105,7 @@ class GUI(QMainWindow):
         self.parameters_layout.addRow(self.tr('Measurement duration:'), self.spin_duration)
         self.parameters_layout.addRow(self.tr('Portion size:'), self.spin_portion_size)
         self.parameters_layout.addRow(self.tr('Sync input frequency divider:'), self.spin_frequency_divider)
+        self.parameters_layout.addRow(self.tr('Data location:'), self.saving_location)
 
         i: int
         t: ChannelSettings
@@ -138,7 +132,6 @@ class GUI(QMainWindow):
         for index in range(len(self.tabs)):
             self.tabs[index].channelChanged.connect(self.on_tab_channel_changed)
             self.tabs[index].toggled.connect(self.on_tab_toggled)
-            self.tabs[index].colorChanged.connect(self.on_tab_color_changed)
 
     def load_settings(self) -> None:
         window_frame: QRect = self.frameGeometry()
@@ -154,6 +147,7 @@ class GUI(QMainWindow):
         self.spin_duration.setValue(cast(float, self.settings.value('measurementDuration', 60.0, float)))
         self.spin_portion_size.setValue(cast(int, self.settings.value('samplesPortionSize', 1000, int)))
         self.spin_frequency_divider.setValue(cast(int, self.settings.value('frequencyDivider', 1, int)))
+        self.saving_location.text.setText(cast(str, self.settings.value('savingLocation', str(Path.cwd()), str)))
         self.settings.endGroup()
 
         i: int
@@ -161,14 +155,6 @@ class GUI(QMainWindow):
             self.settings.setArrayIndex(i)
             self.digital_lines[i + 1] = cast(bool, self.settings.value('pushed', False, bool))
         self.settings.endArray()
-
-        tab: ChannelSettings
-        checked_tabs_count: int = sum(tab.isChecked() for tab in self.tabs)
-        if checked_tabs_count:
-            c: pg.PlotItem
-            for i, c in enumerate(self.canvases):
-                c.setVisible(i < checked_tabs_count)
-        self.plot.setVisible(checked_tabs_count)
 
     def save_settings(self) -> None:
         self.settings.setValue('windowGeometry', self.saveGeometry())
@@ -180,6 +166,7 @@ class GUI(QMainWindow):
         self.settings.setValue('measurementDuration', self.spin_duration.value())
         self.settings.setValue('samplesPortionSize', self.spin_portion_size.value())
         self.settings.setValue('frequencyDivider', self.spin_frequency_divider.value())
+        self.settings.setValue('savingLocation', str(self.saving_location.path))
         self.settings.endGroup()
 
         self.settings.beginWriteArray('digitalLines', len(self.digital_lines))
@@ -224,15 +211,6 @@ class GUI(QMainWindow):
         any_channel_active: bool = any(t.isChecked() for t in self.tabs)
         self.button_start.setEnabled(any_channel_active)
 
-        tab: ChannelSettings
-        checked_tabs_count: int = sum(tab.isChecked() for tab in self.tabs)
-        if checked_tabs_count:
-            i: int
-            c: pg.PlotItem
-            for i, c in enumerate(self.canvases):
-                c.setVisible(i < checked_tabs_count)
-        self.plot.setVisible(checked_tabs_count)
-
         if not on:
             return
 
@@ -243,8 +221,3 @@ class GUI(QMainWindow):
         self.sender().spin_channel.setValue(min(set(list(range(self.sender().spin_channel.minimum() - 1,
                                                                self.sender().spin_channel.maximum())))
                                                 .difference(other_channels)) + 1)
-
-    def on_tab_color_changed(self, color: QColor) -> None:
-        for line, tab in zip(self.plot_lines, self.tabs):
-            if self.sender() is tab:
-                line.setPen(color)

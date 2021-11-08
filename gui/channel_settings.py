@@ -2,12 +2,11 @@
 
 from __future__ import annotations
 
-from typing import cast
+from typing import cast, Optional
 
-from pyqtgraph import ComboBox, ColorButton
+from pyqtgraph import ComboBox
 
 from channel_settings import ChannelSettings as _ChannelSettings
-from gui.file_path_entry import FilePathEntry
 from gui.pg_qt import *
 from stubs import Final
 
@@ -16,7 +15,6 @@ __all__ = ['ChannelSettings']
 
 class ChannelSettings(QGroupBox, _ChannelSettings):
     channelChanged: Signal = Signal(int, name='channelChanged')
-    colorChanged: Signal = Signal(QColor, name='colorChanged')
 
     _count: int = 0
 
@@ -85,25 +83,12 @@ class ChannelSettings(QGroupBox, _ChannelSettings):
         self.spin_averaging.valueChanged.connect(self.on_spin_averaging_changed)
         self.averaging = self.spin_averaging.value()
 
-        self.color_button: ColorButton = ColorButton(self)
-        try:
-            if self._count < settings_length:
-                self.color_button.setColor(self.settings.value('lineColor', QColor(Qt.GlobalColor.lightGray), QColor))
-        except SystemError:
-            pass
-        self.color_button.sigColorChanged.connect(self.on_color_changed)
-
-        self.saving_location: FilePathEntry = FilePathEntry(cast(str, self.settings.value('savingLocation', '', str)),
-                                                            self)
-
         self.setLayout(QFormLayout())
         layout: QFormLayout = cast(QFormLayout, self.layout())
         layout.addRow(self.tr('Range:'), self.combo_range)
         layout.addRow(self.tr('Channel:'), self.spin_channel)
         layout.addRow(self.tr('Mode:'), self.combo_mode)
         layout.addRow(self.tr('Averaging:'), self.spin_averaging)
-        layout.addRow(self.tr('Line color:'), self.color_button)
-        layout.addRow(self.tr('Data file:'), self.saving_location)
         r: int
         for r in range(layout.rowCount()):
             layout.itemAt(r, QFormLayout.ItemRole.LabelRole).widget().setSizePolicy(QSizePolicy.Policy.Expanding,
@@ -156,9 +141,9 @@ class ChannelSettings(QGroupBox, _ChannelSettings):
         self.settings.setValue('averaging', self.averaging)
         self.settings.endArray()
 
-    def on_color_changed(self, sender: ColorButton) -> None:
-        self.settings.beginWriteArray('channelSettings', self._count)
-        self.settings.setArrayIndex(self._index)
-        self.settings.setValue('lineColor', sender.color())
-        self.settings.endArray()
-        self.colorChanged.emit(sender.color())
+    @property
+    def channel(self) -> Optional[int]:
+        if self.isChecked():
+            return self.spin_channel.value()
+        else:
+            return None
