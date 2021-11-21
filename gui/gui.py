@@ -3,23 +3,28 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Dict, List, Set, Tuple, Union, cast
+from typing import cast, Dict, List, Sequence, Set, Tuple, Union
 
 import numpy as np
 import pyqtgraph as pg  # type: ignore
 
+from e502 import X502_ADC_FREQ_DIV_MAX
 from gui.channel_settings import ChannelSettings
 from gui.digital_lines import DigitalLines
 from gui.dir_path_entry import DirPathEntry
 from gui.ip_address_entry import IPAddressEntry
 from gui.pg_qt import *
-
-from e502 import X502_ADC_FREQ_DIV_MAX
+from stubs import Final
 
 __all__ = ['GUI']
 
 
 class GUI(QMainWindow):
+    CHANNEL_NAMES: Final[Sequence[str]] = (
+        'Sync',
+        'Signal'
+    )
+
     def __init__(self) -> None:
         super(GUI, self).__init__()
 
@@ -44,7 +49,7 @@ class GUI(QMainWindow):
         self.saving_location: DirPathEntry = DirPathEntry('', self)
 
         self.tabs_container: QTabWidget = QTabWidget(self.central_widget)
-        self.tabs: List[ChannelSettings] = [ChannelSettings(self.settings) for _ in range(8)]
+        self.tabs: List[ChannelSettings] = [ChannelSettings(self.settings) for _ in range(len(GUI.CHANNEL_NAMES))]
 
         self.button_start: QPushButton = QPushButton(self.central_widget)
         self.button_stop: QPushButton = QPushButton(self.central_widget)
@@ -107,10 +112,10 @@ class GUI(QMainWindow):
         self.parameters_layout.addRow(self.tr('Sync input frequency divider:'), self.spin_frequency_divider)
         self.parameters_layout.addRow(self.tr('Data location:'), self.saving_location)
 
-        i: int
+        title: str
         t: ChannelSettings
-        for i, t in enumerate(self.tabs):
-            self.tabs_container.addTab(t, str(i + 1))
+        for title, t in zip(GUI.CHANNEL_NAMES, self.tabs):
+            self.tabs_container.addTab(t, self.tr(title))
 
         self.buttons_layout.addWidget(self.button_start)
         self.buttons_layout.addWidget(self.button_stop)

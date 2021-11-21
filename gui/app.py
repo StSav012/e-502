@@ -45,7 +45,7 @@ class App(GUI):
                 / str(self._start_date.year)
                 / str(self._start_date.month)
                 / str(self._start_date.day)
-                / str(channel)
+                / self.tabs[channel].title()
                 / f'imp_{self._measurement_index:06g}.csv')
 
     def on_button_start_clicked(self) -> None:
