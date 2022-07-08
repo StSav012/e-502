@@ -61,7 +61,7 @@ class App(GUI):
         if date.today() != self._start_date:
             self._measurement_index = 1
         self._start_date = date.today()
-        while any(self._saving_location(i + 1).exists() for i in range(32)):
+        while any(self._saving_location(i + 1).exists() for i in range(len(self.tabs))):
             self._measurement_index += 1
         self._data = [np.empty(0) for _ in active_settings]
         self.measurement = Measurement(self.results_queue,
