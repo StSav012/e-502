@@ -20,9 +20,4 @@ else:
     Final = _Final()
     Literal = _Literal()
 
-if sys.version_info >= (3, 10):
-    from typing import NoneType
-else:
-    NoneType = type(None)
-
-__all__ = ['Final', 'Literal', 'NoneType']
+__all__ = ['Final', 'Literal']
