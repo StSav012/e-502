@@ -71,4 +71,4 @@ class E502:
             raise ValueError('Invalid data size', size)
         time.sleep(0.5)
         print(f'{size} random numbers')
-        return np.random.random((size, len(self._settings)), dtype=np.float64)
+        return np.random.random((size, len(self._settings)))
